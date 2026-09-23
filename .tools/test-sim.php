@@ -54,7 +54,8 @@ function IPS_GetObject(int $id): array { return ['ObjectIdent' => $GLOBALS['VARS
 function IPS_DeleteVariable(int $id): bool { unset($GLOBALS['VARS'][$id]); return true; }
 function IPS_SetHidden(int $id, bool $h): bool { $GLOBALS['VARS'][$id]['hidden'] = $h; return true; }
 function IPS_GetName(int $id): string { return $GLOBALS['VARS'][$id]['name'] ?? ''; }
-function IPS_GetLibrary(string $guid): array { return ['Version' => '0.0.0-test', 'Build' => 0]; }
+// Echte Version aus library.json (mit Beta-Suffix, damit baseVersion() mitgeprüft wird)
+function IPS_GetLibrary(string $guid): array { $lib = json_decode(file_get_contents(dirname(__DIR__) . '/library.json'), true); return ['Version' => $lib['version'] . '-beta.1', 'Build' => (int)$lib['build']]; }
 
 class IPSModule
 {
@@ -338,6 +339,18 @@ check('Kein Link-Button trägt die URL direkt in "link"', !preg_match('/"link":"
 $m->AckPurposeIntro(); $m->AckNews(); $m->AckForumHint();
 $f2 = form($m);
 check('Nach Bestätigen: Intro/News/Forum weg, Lizenz bleibt', count($f2['elements']) === count($f['elements']) - 3 && str_contains(end($f2['elements'])['caption'], 'Über dieses Modul'));
+// News-Panel nach NEWS_VERSIONS-Muster (SUITE.md Formular-Optik Punkt 1)
+$libVer = json_decode(file_get_contents(dirname(__DIR__) . '/library.json'), true)['version'];
+check('AckNews speichert die installierte Version ohne Beta-Suffix', $m->attrs['SeenNews'] === $libVer, $m->attrs['SeenNews']);
+check('Höchster NEWS_VERSIONS-Eintrag = library.json-Version (Pflege-Pflicht)', str_contains(formText($f), 'Neu bis Version ' . $libVer), $f['elements'][1]['caption'] ?? '');
+check('Frisch installiert: alle Versionen im Banner (0.1.0 und ' . $libVer . ')', str_contains(formText($f), 'Version 0.1.0:') && str_contains(formText($f), 'Version ' . $libVer . ':'));
+$m->attrs['SeenNews'] = '0.1.0';
+$f3 = form($m);
+$hasNews = fn(array $f) => count(array_filter($f['elements'], fn($e) => ($e['name'] ?? '') === 'NewsPanel')) === 1;
+check('Nach Update von 0.1.0: Banner zeigt nur die Lücke (0.1.1+), nicht 0.1.0', $hasNews($f3) && !str_contains(formText($f3), 'Version 0.1.0:') && str_contains(formText($f3), 'Version 0.1.1:'), formText($f3));
+$m->attrs['SeenNews'] = '9.9.9';
+check('Nichts Neueres als SeenNews: kein Banner', !$hasNews(form($m)));
+$m->attrs['SeenNews'] = $libVer;
 $GLOBALS['LOC'] = [];
 check('Ohne Location Control: ℹ️-Rückfall-Hinweis statt ✅', str_contains(formText(form($m)), 'Keine Location-Control-Instanz'));
 $GLOBALS['LOC'] = [10443 => true];

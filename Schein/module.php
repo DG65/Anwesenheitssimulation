@@ -39,7 +39,23 @@ class Schein extends IPSModule
     private const LOCATION_CONTROL_GUID = '{45E97A63-F870-408A-B259-2933F7EABF74}';
 
     // Formular-Konvention (SUITE.md "Einheitliche Formular-Optik").
-    private const NEWS_VERSION = '0.1.0';
+    // "Was ist Neu": Schlüssel = Version ohne Beta-/Build-Suffix, Wert = Zeilen.
+    // Der Banner zeigt alle Einträge neuer als die zuletzt bestätigte Version
+    // (SUITE.md "Einheitliche Formular-Optik" Punkt 1, NEWS_VERSIONS-Muster).
+    private const NEWS_VERSIONS = [
+        '0.1.0' => [
+            '• Erstes Release: Lernen echter Schaltmuster je Kanal (ohne Symcon-Archiv), Abspielen nach dem Vorbild-Tag-Prinzip mit Zufallsversatz, gemeinsamer Vorbild-Tag für alle Kanäle.',
+            '• Zeitbezug je Kanal wahlweise Uhrzeit oder Abstand zu Sonnenauf-/-untergang (nutzt Symcons eingebaute Location-Control-Instanz, falls vorhanden).',
+            '• Start/Stopp per Schalter, Formular-Button, Skript (IPS_RequestAction) oder Auslöser-Variable; „📅 Heutigen Ablauf anzeigen" zeigt den Plan.',
+            '• 👋 Zweck-Einführung ganz oben im Formular (einmalig wegklickbar).',
+        ],
+        '0.1.1' => [
+            '• Alle sichtbaren Datumsangaben (Vorbild-Tag, Statuszeile, Kanal-Zusammenfassung) jetzt im Format TT.MM.JJJJ.',
+        ],
+        '0.1.2' => [
+            '• Dieses Panel zeigt nach einem Update nur noch, was seit der zuletzt bestätigten Version neu ist.',
+        ],
+    ];
     private const REPO_URL     = 'https://github.com/DG65/Schein';
     private const LICENSE_URL  = 'https://github.com/DG65/Schein/blob/main/LICENSE';
     private const PAYPAL_URL   = 'https://paypal.me/DietmarGureth';
@@ -845,8 +861,29 @@ class Schein extends IPSModule
 
     public function AckNews(): void
     {
-        $this->WriteAttributeString('SeenNews', self::NEWS_VERSION);
+        // Gespeichert wird die tatsächlich INSTALLIERTE Version, nicht der
+        // zuletzt gezeigte Eintrag — so zeigt der Banner nach einem Update
+        // genau die Lücke seit dieser Bestätigung.
+        $this->WriteAttributeString('SeenNews', $this->installedVersion());
         $this->UpdateFormField('NewsPanel', 'visible', false);
+    }
+
+    /** Version ohne Beta-/Build-Suffix ("0.1.2-beta.1" → "0.1.2"). */
+    private static function baseVersion(string $version): string
+    {
+        return preg_replace('/-.*$/', '', $version);
+    }
+
+    /** Installierte Bibliotheksversion; ohne Kernel-Auskunft der höchste NEWS_VERSIONS-Schlüssel. */
+    private function installedVersion(): string
+    {
+        $lib = @IPS_GetLibrary(self::LIBRARY_GUID);
+        if (is_array($lib) && !empty($lib['Version'])) {
+            return self::baseVersion((string)$lib['Version']);
+        }
+        $keys = array_keys(self::NEWS_VERSIONS);
+        usort($keys, 'version_compare');
+        return (string)end($keys);
     }
 
     public function AckForumHint(): void
@@ -874,19 +911,32 @@ class Schein extends IPSModule
 
     private function NewsBanner(): ?array
     {
-        if ($this->ReadAttributeString('SeenNews') === self::NEWS_VERSION) {
+        $seen = $this->ReadAttributeString('SeenNews');
+        if ($seen === '') {
+            $seen = '0';
+        }
+        $pending = [];
+        foreach (self::NEWS_VERSIONS as $version => $lines) {
+            if (version_compare((string)$version, $seen, '>')) {
+                $pending[(string)$version] = $lines;
+            }
+        }
+        if (count($pending) === 0) {
             return null;
         }
+        uksort($pending, 'version_compare');
+        $items = [];
+        foreach ($pending as $version => $lines) {
+            $items[] = ['type' => 'Label', 'caption' => 'Version ' . $version . ':'];
+            foreach ($lines as $line) {
+                $items[] = ['type' => 'Label', 'caption' => $line];
+            }
+        }
+        $items[] = ['type' => 'Button', 'caption' => 'Verstanden – nicht mehr anzeigen', 'onClick' => 'SCHEIN_AckNews($id);'];
         return [
             'type' => 'ExpansionPanel', 'name' => 'NewsPanel', 'expanded' => true,
-            'caption' => '🆕  Neu in Version ' . self::NEWS_VERSION,
-            'items' => [
-                ['type' => 'Label', 'caption' => '• Erstes Release: Lernen echter Schaltmuster je Kanal (ohne Symcon-Archiv), Abspielen nach dem Vorbild-Tag-Prinzip mit Zufallsversatz, gemeinsamer Vorbild-Tag für alle Kanäle.'],
-                ['type' => 'Label', 'caption' => '• Zeitbezug je Kanal wahlweise Uhrzeit oder Abstand zu Sonnenauf-/-untergang (nutzt Symcons eingebaute Location-Control-Instanz, falls vorhanden).'],
-                ['type' => 'Label', 'caption' => '• Start/Stopp per Schalter, Formular-Button, Skript (IPS_RequestAction) oder Auslöser-Variable; „📅 Heutigen Ablauf anzeigen" zeigt den Plan.'],
-                ['type' => 'Label', 'caption' => '• 👋 Zweck-Einführung ganz oben im Formular (einmalig wegklickbar).'],
-                ['type' => 'Button', 'caption' => 'Verstanden – nicht mehr anzeigen', 'onClick' => 'SCHEIN_AckNews($id);'],
-            ],
+            'caption' => '🆕  Neu bis Version ' . array_key_last($pending),
+            'items' => $items,
         ];
     }
 

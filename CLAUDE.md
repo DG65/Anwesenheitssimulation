@@ -69,6 +69,10 @@
     `fmtDay()` für den Vorbild-Tag, `date('d.m.Y …')` für Zeitstempel, auch im `SendDebug()`.
     Der Vorbild-Tag bleibt intern `Y-m-d` (Schlüssel im Tagesplan-Attribut, `date()`-Vergleiche),
     nur die Anzeige wandelt. Der Prüfstand schlägt bei `JJJJ-MM-TT` in Formular/Status/Debug an.
+11. **„Neu"-Panel = `NEWS_VERSIONS`-Array** (SUITE.md Formular-Optik Punkt 1, seit 0.1.2): bei
+    jeder nutzersichtbaren Änderung einen Eintrag unter der neuen `library.json`-Version
+    ergänzen — der Prüfstand verlangt, dass der höchste Schlüssel gleich der `library.json`-
+    Version ist. `AckNews()` speichert die installierte Version (ohne Suffix), nie den Schlüssel.
 
 ## Prüfen
 

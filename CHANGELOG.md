@@ -3,6 +3,15 @@
 Alle nennenswerten Änderungen an diesem Modul werden hier dokumentiert.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 
+## [0.1.2] - 2026-09-23
+
+### Changed
+- „🆕 Neu"-Panel nach dem verbundweiten `NEWS_VERSIONS`-Muster (SUITE.md Formular-Optik
+  Punkt 1, Dashboard/Dietmar 23.09.2026): Einträge je Version, Banner zeigt nach einem Update
+  nur die Lücke seit der zuletzt bestätigten Version („Neu bis Version X"), „Verstanden"
+  speichert die tatsächlich installierte Bibliotheksversion. Bestehende Bestätigungen bleiben
+  gültig (alter Wert „0.1.0" wird per `version_compare` weiter verstanden).
+
 ## [0.1.1] - 2026-09-13
 
 ### Changed

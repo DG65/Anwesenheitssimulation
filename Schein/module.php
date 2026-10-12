@@ -55,6 +55,9 @@ class Schein extends IPSModule
         '0.1.2' => [
             '• Dieses Panel zeigt nach einem Update nur noch, was seit der zuletzt bestätigten Version neu ist.',
         ],
+        '0.1.3' => [
+            '• Fehlgeschlagene Schaltungen stehen im Meldungsprotokoll jetzt mit der Schein-Instanz als Absender (anklickbar).',
+        ],
     ];
     private const REPO_URL     = 'https://github.com/DG65/Schein';
     private const LICENSE_URL  = 'https://github.com/DG65/Schein/blob/main/LICENSE';
@@ -626,7 +629,8 @@ class Schein extends IPSModule
         if (!$ok) {
             // Fehlschlag dauerhaft loggen, nicht nur ins flüchtige Debug
             // (SUITE.md "Sichtbare Rückmeldung", Regel 5).
-            IPS_LogMessage('Schein', 'Schaltung fehlgeschlagen: ' . $label . ' (Variable #' . $tid . ')' . ($error !== '' ? ' — ' . $error : ''));
+            // $this->LogMessage statt IPS_LogMessage (SUITE.md Store-Review Punkt 15): die Instanz ist Absender.
+            $this->LogMessage('Schaltung fehlgeschlagen: ' . $label . ' (Variable #' . $tid . ')' . ($error !== '' ? ' — ' . $error : ''), KL_WARNING);
             $this->setStringIfChanged('LastAction', date('H:i:s', $this->now()) . ' Uhr: ⚠️ ' . $label . ' fehlgeschlagen');
             return;
         }

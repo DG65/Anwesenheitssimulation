@@ -57,8 +57,10 @@
 6. **Kalenderrechnung DST-sicher** (SUITE.md Stolperstein 18): `mktime()`/`strtotime('-N days')`,
    nie `±86400`.
 7. **Schalten:** `HasAction()` → `RequestAction($vid, $wert)`, sonst `SetValue()`; Wert per
-   `castForVariable()` auf den Variablentyp. Fehlschlag → `IPS_LogMessage()` (dauerhaft), nicht nur
-   `SendDebug()`.
+   `castForVariable()` auf den Variablentyp. Fehlschlag → `$this->LogMessage(…, KL_WARNING)`
+   (dauerhaft), nicht nur `SendDebug()`. **Nie `IPS_LogMessage()` in der Modulklasse** (SUITE.md
+   Store-Review Punkt 15, Symcon-Review 12.10.2026) — der Prüfstand hat keinen Stub dafür und
+   prüft zusätzlich per `strpos`, dass es in `module.php` nicht vorkommt.
 8. **Öffentliche Methoden:** nur skalare Parametertypen, keine PHP-Standardwerte (Stolperstein
    8/20), `SetActive()` (public) vs. `switchSimulation()` (private) — PHP-Methodennamen sind
    case-insensitiv, `setActive` wäre eine Kollision.

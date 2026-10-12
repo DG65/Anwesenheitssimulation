@@ -3,6 +3,15 @@
 Alle nennenswerten Änderungen an diesem Modul werden hier dokumentiert.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 
+## [0.1.3] - 2026-10-12
+
+### Changed
+- Protokollierung fehlgeschlagener Schaltungen über `$this->LogMessage(…, KL_WARNING)` statt
+  `IPS_LogMessage()` — die Schein-Instanz ist jetzt selbst Absender im Meldungsprotokoll
+  (SUITE.md Store-Review-Checkliste Punkt 15, Symcon-Review 12.10.2026). Prüfstand wacht
+  darüber, dass `IPS_LogMessage` in `module.php` nicht mehr vorkommt, und prüft den
+  Fehlschlag-Pfad einer Schaltung.
+
 ## [0.1.2] - 2026-09-23
 
 ### Changed

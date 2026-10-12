@@ -42,8 +42,10 @@ function GetValueString($id): string { return (string)$GLOBALS['VARS'][(int)$id]
 function SetValue($id, $v): bool { $GLOBALS['VARS'][(int)$id]['value'] = $v; $GLOBALS['ACTIONS'][] = [$GLOBALS['CLOCK'], (int)$id, $v, 'SetValue']; return true; }
 function SetValueString($id, string $v): bool { $GLOBALS['VARS'][(int)$id]['value'] = $v; return true; }
 function HasAction($id): bool { return (bool)$GLOBALS['VARS'][(int)$id]['action']; }
-function RequestAction($id, $v): bool { $GLOBALS['VARS'][(int)$id]['value'] = $v; $GLOBALS['ACTIONS'][] = [$GLOBALS['CLOCK'], (int)$id, $v, 'RequestAction']; return true; }
-function IPS_LogMessage(string $s, string $m): bool { $GLOBALS['LOG'][] = "$s: $m"; return true; }
+function RequestAction($id, $v): bool { if (!empty($GLOBALS['FAIL_RA'])) { return false; } $GLOBALS['VARS'][(int)$id]['value'] = $v; $GLOBALS['ACTIONS'][] = [$GLOBALS['CLOCK'], (int)$id, $v, 'RequestAction']; return true; }
+// Bewusst KEIN IPS_LogMessage()-Stub: ein Aufruf im Modul wäre ein Fatal Error
+// (SUITE.md Store-Review Punkt 15 — nur $this->LogMessage in Modulklassen).
+const KL_MESSAGE = 10201; const KL_NOTIFY = 10203; const KL_WARNING = 10204; const KL_ERROR = 10205; const KL_DEBUG = 10206; const KL_CUSTOM = 10207;
 function IPS_GetInstanceListByModuleID(string $guid): array { return array_keys($GLOBALS['LOC']); }
 function IPS_GetObjectIDByIdent(string $ident, int $parent) {
     foreach ($GLOBALS['VARS'] as $id => $v) { if ($v['ident'] === $ident && $v['parent'] === $parent) { return $id; } }
@@ -93,6 +95,7 @@ class IPSModule
     public function UnregisterMessage(int $sender, int $msg): void { unset($this->messages[$sender][$msg]); if (empty($this->messages[$sender])) { unset($this->messages[$sender]); } }
     public function GetMessageList(): array { $o = []; foreach ($this->messages as $s => $m) { $o[$s] = array_keys($m); } return $o; }
     public function SendDebug(string $a, string $b, int $c): void { $this->debug[] = "$a: $b"; }
+    public function LogMessage(string $m, int $type): void { $GLOBALS['LOG'][] = "[$type] $m"; }
     public function UpdateFormField(string $n, string $p, $v): void { $this->fieldUpdates[] = [$n, $p, $v]; }
     public function ReloadForm(): void { $this->reloads++; }
     public function MaintainVariable(string $ident, string $name, int $type, string $profile, int $pos, bool $keep): void
@@ -372,6 +375,21 @@ foreach (array_unique($mm[1]) as $fn) {
     check("SCHEIN_$fn → public function $fn() existiert", $rc->hasMethod($fn) && $rc->getMethod($fn)->isPublic());
 }
 check('Kern-Aktionen sind im Formular verdrahtet', count(array_diff(['SetActive', 'Preview'], array_unique($mm[1]))) === 0);
+check('Kein IPS_LogMessage( in module.php (SUITE.md Store-Review Punkt 15, nur $this->LogMessage)', strpos(file_get_contents(dirname(__DIR__) . '/Schein/module.php'), 'IPS_LogMessage(') === false);
+
+heading('12. Fehlgeschlagene Schaltung landet dauerhaft im Protokoll (über $this->LogMessage)');
+$m->props['Channels'] = json_encode([['Caption' => 'Kaputt', 'TargetID' => 100, 'Mode' => 1, 'TimeRef' => 0, 'JitterMin' => 0]]);
+$m->ApplyChanges();
+$GLOBALS['VARS'][100]['action'] = true;
+// Zielvariable "schlägt fehl": RequestAction liefert false → Modul muss warnen, nicht schweigen.
+$GLOBALS['FAIL_RA'] = true;
+clock('2026-09-08 12:00:00'); fire($m, 100, true); clock('2026-09-08 12:30:00'); fire($m, 100, false);
+clock('2026-09-09 12:05:00'); $m->index = 0; $logBefore = count($GLOBALS['LOG']);
+$m->RequestAction('Active', true);
+check('Fehlschlag wird per LogMessage mit KL_WARNING protokolliert', count($GLOBALS['LOG']) === $logBefore + 1 && str_contains(end($GLOBALS['LOG']), '[' . KL_WARNING . '] Schaltung fehlgeschlagen'), implode(' | ', array_slice($GLOBALS['LOG'], -2)));
+check('LastAction zeigt ⚠️ fehlgeschlagen', str_contains($m->GetValue('LastAction'), '⚠️'), $m->GetValue('LastAction'));
+$GLOBALS['FAIL_RA'] = false;
+$m->RequestAction('Active', false);
 
 echo "\n" . str_repeat('-', 62) . "\n";
 if ($fails === 0) {

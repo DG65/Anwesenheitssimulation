@@ -1,12 +1,12 @@
 {
   "id": "{B4C508FF-14C4-47C2-8EC4-7AF933A3CCD0}",
   "author": "DG65",
-  "name": "DG65 Toolkit Schein",
-  "url": "https://github.com/DG65/Schein",
+  "name": "DG65-Toolkit Anwesenheitssimulation",
+  "url": "https://github.com/DG65/Anwesenheitssimulation",
   "compatibility": {
     "version": "9.0"
   },
-  "version": "0.1.3",
-  "build": 4,
-  "date": 1791763200
+  "version": "0.2.0",
+  "build": 5,
+  "date": 1791849600
 }

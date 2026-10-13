@@ -1,18 +1,20 @@
 <?php
 
 // ===========================================================================
-// Schein (DG65 Toolkit) — Anwesenheitssimulation für JEDE schaltbare
-// Variable, geräteunabhängig.
+// DG65-Toolkit Anwesenheitssimulation (vormals „Schein", umbenannt 13.10.2026)
+// — für JEDE schaltbare Variable, geräteunabhängig. Es erzeugt den
+// Lichtschein eines bewohnten Hauses: der Schein trügt.
 //
-// „Schein" ist beides: der Lichtschein, den das Modul erzeugt, und der
-// Anschein, den es damit vorgibt — der Schein trügt.
+// Klassenname bewusst mit DG65-Vorsatz: Symcons eigenes Modul heißt
+// „AnwesenheitsSimulation", PHP-Klassennamen sind case-insensitiv —
+// ohne Vorsatz gäbe es „Cannot redeclare class", sobald beide installiert sind.
 //
 // WIE ES ARBEITET:
-//   Lernen  — solange die Simulation AUS ist, zeichnet Schein jede echte
+//   Lernen  — solange die Simulation AUS ist, zeichnet das Modul jede echte
 //             Wertänderung der Zielvariablen auf (per VM_UPDATE-Nachricht,
 //             kein Polling): Zeitstempel + Wert, in einem versteckten
 //             Ringpuffer je Kanal, begrenzt auf das Lernfenster (Tage).
-//   Abspielen — ist die Simulation AN, wählt Schein pro Tag einen echten
+//   Abspielen — ist die Simulation AN, wählt das Modul pro Tag einen echten
 //             „Vorbild-Tag" desselben Wochentags aus dem Gelernten und
 //             spielt dessen Schaltfolge zeitversetzt (Jitter) ab. So bleibt
 //             die Reihenfolge eines realen Abends erhalten (erst Wohnzimmer,
@@ -20,7 +22,7 @@
 //             dieselbe Uhrzeit fällt. Optional kann jeder Kanal an
 //             Sonnenauf-/-untergang statt an die Uhrzeit gekoppelt sein —
 //             dafür reicht Symcons eingebaute Location-Control-Instanz.
-//   Während die Simulation läuft, wird NICHT gelernt — sonst würde Schein
+//   Während die Simulation läuft, wird NICHT gelernt — sonst würde das Modul
 //   seine eigenen Wiedergaben als echtes Verhalten mitlernen.
 //
 // Eigenständig: setzt kein anderes Modul voraus (Location Control ist ein
@@ -28,7 +30,7 @@
 // vorausgesetzt.
 // ===========================================================================
 
-class Schein extends IPSModule
+class DG65Anwesenheitssimulation extends IPSModule
 {
     private const LIBRARY_GUID = '{B4C508FF-14C4-47C2-8EC4-7AF933A3CCD0}';
     private const MODULE_GUID  = '{00F44496-648D-4AE0-9AC8-A6002EFCEF54}';
@@ -56,11 +58,14 @@ class Schein extends IPSModule
             '• Dieses Panel zeigt nach einem Update nur noch, was seit der zuletzt bestätigten Version neu ist.',
         ],
         '0.1.3' => [
-            '• Fehlgeschlagene Schaltungen stehen im Meldungsprotokoll jetzt mit der Schein-Instanz als Absender (anklickbar).',
+            '• Fehlgeschlagene Schaltungen stehen im Meldungsprotokoll jetzt mit der Instanz als Absender (anklickbar).',
+        ],
+        '0.2.0' => [
+            '• Das Modul heißt jetzt „DG65-Toolkit Anwesenheitssimulation" (vormals „Schein"); Skript-Funktionen beginnen mit ANWSIM_ statt SCHEIN_ (z. B. ANWSIM_Preview). Instanzen, Kanäle und Gelerntes bleiben erhalten.',
         ],
     ];
-    private const REPO_URL     = 'https://github.com/DG65/Schein';
-    private const LICENSE_URL  = 'https://github.com/DG65/Schein/blob/main/LICENSE';
+    private const REPO_URL     = 'https://github.com/DG65/Anwesenheitssimulation';
+    private const LICENSE_URL  = 'https://github.com/DG65/Anwesenheitssimulation/blob/main/LICENSE';
     private const PAYPAL_URL   = 'https://paypal.me/DietmarGureth';
 
     private const TICK_MS      = 60000; // Wiedergabe-Takt: minütlich
@@ -101,7 +106,7 @@ class Schein extends IPSModule
         $this->RegisterAttributeString('SeenNews', '');
         $this->RegisterAttributeBoolean('ForumHintGone', false);
 
-        $this->RegisterTimer('Tick', 0, 'SCHEIN_Tick($_IPS[\'TARGET\']);');
+        $this->RegisterTimer('Tick', 0, 'ANWSIM_Tick($_IPS[\'TARGET\']);');
     }
 
     public function ApplyChanges()
@@ -212,20 +217,20 @@ class Schein extends IPSModule
     // Öffentliche Aktionen (Formular-Buttons, Skripte)
     // -----------------------------------------------------------------
 
-    /** SCHEIN_SetActive($id, bool $active): string — Simulation starten/beenden, mit Ergebnistext. */
+    /** ANWSIM_SetActive($id, bool $active): string — Simulation starten/beenden, mit Ergebnistext. */
     public function SetActive(bool $active): string
     {
         if ($active === $this->isActive()) {
             return $active
                 ? 'ℹ️ Die Simulation läuft bereits (seit ' . date('d.m.Y H:i', $this->ReadAttributeInteger('ActiveSince')) . ' Uhr).'
-                : 'ℹ️ Die Simulation ist bereits aus — Schein lernt gerade.';
+                : 'ℹ️ Die Simulation ist bereits aus — das Modul lernt gerade.';
         }
         if ($active && count($this->playableChannels()) === 0) {
             return '⚠️ Kein Kanal steht auf „Lernen + Abspielen" mit gültiger Zielvariable — es gäbe nichts abzuspielen. Erst Kanäle anlegen und übernehmen.';
         }
         $this->switchSimulation($active, 'Formular');
         if (!$active) {
-            return '⏹ Simulation beendet — ab jetzt lernt Schein wieder mit. Die Zielvariablen bleiben so, wie sie gerade stehen.';
+            return '⏹ Simulation beendet — ab jetzt lernt das Modul wieder mit. Die Zielvariablen bleiben so, wie sie gerade stehen.';
         }
         $plan = $this->plan();
         $lines = ['▶️ Simulation gestartet.'];
@@ -239,7 +244,7 @@ class Schein extends IPSModule
     }
 
     /**
-     * SCHEIN_Preview($id): string — zeigt, was heute abgespielt wird
+     * ANWSIM_Preview($id): string — zeigt, was heute abgespielt wird
      * (bei laufender Simulation der echte Plan, sonst ein probeweise
      * gewählter Plan, der NICHT gespeichert wird).
      */
@@ -254,7 +259,7 @@ class Schein extends IPSModule
         }
         $lines = [$active
             ? '📅 Heutiger Ablauf (Simulation läuft seit ' . date('H:i', $this->ReadAttributeInteger('ActiveSince')) . ' Uhr):'
-            : '📅 So würde Schein heute abspielen (Simulation ist aus, Vorbild-Tag probeweise gewählt):'];
+            : '📅 So würde die Anwesenheitssimulation heute abspielen (Simulation ist aus, Vorbild-Tag probeweise gewählt):'];
         foreach ($channels as $ch) {
             $tid = (int)$ch['TargetID'];
             $p = $plan['channels'][$tid] ?? null;
@@ -272,7 +277,7 @@ class Schein extends IPSModule
         return implode("\n", $lines);
     }
 
-    /** SCHEIN_ForgetChannel($id, string $caption): string — Gelerntes eines Kanals verwerfen. */
+    /** ANWSIM_ForgetChannel($id, string $caption): string — Gelerntes eines Kanals verwerfen. */
     public function ForgetChannel(string $caption): string
     {
         foreach ($this->channels() as $ch) {
@@ -905,10 +910,10 @@ class Schein extends IPSModule
             'type' => 'ExpansionPanel', 'name' => 'PurposeIntroPanel', 'expanded' => true,
             'caption' => '👋  Wozu dieses Modul?',
             'items' => [
-                ['type' => 'Label', 'caption' => 'Schein lässt ein leeres Haus bewohnt aussehen. Es merkt sich, wann ihr im Alltag wirklich Licht, Rollläden, Steckdosen oder das Radio schaltet — jede schaltbare Symcon-Variable, egal aus welchem Modul — und spielt dieses echte Muster ab, sobald niemand da ist.'],
-                ['type' => 'Label', 'caption' => 'Der Nutzen: keine starren Zeitpläne, die jeder Beobachter nach zwei Abenden durchschaut. Schein wählt jeden Tag einen echten Vorbild-Tag desselben Wochentags aus den letzten Wochen, verschiebt ihn zufällig um ein paar Minuten und hält die Reihenfolge zwischen den Räumen glaubwürdig — der Schein trügt.'],
-                ['type' => 'Label', 'caption' => 'Starten per Schalter „Simulation aktiv" (auch aus WebFront/Kachel oder per Skript) oder automatisch über eine Abwesenheits-/Alarm-Variable. Solange die Simulation aus ist, lernt Schein einfach mit.'],
-                ['type' => 'Button', 'caption' => 'Verstanden – nicht mehr anzeigen', 'onClick' => 'SCHEIN_AckPurposeIntro($id);'],
+                ['type' => 'Label', 'caption' => 'Die Anwesenheitssimulation lässt ein leeres Haus bewohnt aussehen. Es merkt sich, wann ihr im Alltag wirklich Licht, Rollläden, Steckdosen oder das Radio schaltet — jede schaltbare Symcon-Variable, egal aus welchem Modul — und spielt dieses echte Muster ab, sobald niemand da ist.'],
+                ['type' => 'Label', 'caption' => 'Der Nutzen: keine starren Zeitpläne, die jeder Beobachter nach zwei Abenden durchschaut. Das Modul wählt jeden Tag einen echten Vorbild-Tag desselben Wochentags aus den letzten Wochen, verschiebt ihn zufällig um ein paar Minuten und hält die Reihenfolge zwischen den Räumen glaubwürdig — der Schein trügt.'],
+                ['type' => 'Label', 'caption' => 'Starten per Schalter „Simulation aktiv" (auch aus WebFront/Kachel oder per Skript) oder automatisch über eine Abwesenheits-/Alarm-Variable. Solange die Simulation aus ist, lernt das Modul einfach mit.'],
+                ['type' => 'Button', 'caption' => 'Verstanden – nicht mehr anzeigen', 'onClick' => 'ANWSIM_AckPurposeIntro($id);'],
             ],
         ];
     }
@@ -936,7 +941,7 @@ class Schein extends IPSModule
                 $items[] = ['type' => 'Label', 'caption' => $line];
             }
         }
-        $items[] = ['type' => 'Button', 'caption' => 'Verstanden – nicht mehr anzeigen', 'onClick' => 'SCHEIN_AckNews($id);'];
+        $items[] = ['type' => 'Button', 'caption' => 'Verstanden – nicht mehr anzeigen', 'onClick' => 'ANWSIM_AckNews($id);'];
         return [
             'type' => 'ExpansionPanel', 'name' => 'NewsPanel', 'expanded' => true,
             'caption' => '🆕  Neu bis Version ' . array_key_last($pending),
@@ -948,21 +953,21 @@ class Schein extends IPSModule
     {
         $lib    = @IPS_GetLibrary(self::LIBRARY_GUID);
         $verTxt = (is_array($lib) && isset($lib['Version']))
-            ? 'ℹ️ Schein Version ' . $lib['Version'] . ' (Build ' . ($lib['Build'] ?? '?') . ')'
-            : 'ℹ️ Schein';
+            ? 'ℹ️ Anwesenheitssimulation Version ' . $lib['Version'] . ' (Build ' . ($lib['Build'] ?? '?') . ')'
+            : 'ℹ️ Anwesenheitssimulation';
         return [
             'type' => 'ExpansionPanel', 'expanded' => false,
             'caption' => '📖  Dokumentation & Hilfe',
             'items' => [
                 ['type' => 'Label', 'caption' => $verTxt],
                 ['type' => 'Label', 'caption' => 'Kanal anlegen: Bezeichnung, Zielvariable (Bool, Integer oder Float — z. B. ein Licht, eine Steckdose, ein Rollladen), Modus, Zeitbezug und Versatz wählen, dann „Übernehmen". Pro Kanal entsteht eine versteckte Variable „Gelernt: …" (der Lernspeicher, kein Symcon-Archiv nötig).'],
-                ['type' => 'Label', 'caption' => 'Lernen: Solange „Simulation aktiv" AUS ist, zeichnet Schein jede echte Wertänderung der Zielvariable auf — Zeitpunkt und Wert. Alles außerhalb des Lernfensters (Standard 28 Tage) fällt automatisch heraus; so folgt das Muster der Jahreszeit von selbst.'],
-                ['type' => 'Label', 'caption' => 'Abspielen: Ist die Simulation AN, wählt Schein für jeden Tag einen echten Vorbild-Tag desselben Wochentags (ersatzweise Werktag/Wochenende) und spielt dessen Schaltfolge ab — verschoben um einen zufälligen Versatz bis zum eingestellten Maximum. Beim Start wird zuerst der Zustand hergestellt, den das Vorbild um diese Uhrzeit hatte.'],
+                ['type' => 'Label', 'caption' => 'Lernen: Solange „Simulation aktiv" AUS ist, zeichnet das Modul jede echte Wertänderung der Zielvariable auf — Zeitpunkt und Wert. Alles außerhalb des Lernfensters (Standard 28 Tage) fällt automatisch heraus; so folgt das Muster der Jahreszeit von selbst.'],
+                ['type' => 'Label', 'caption' => 'Abspielen: Ist die Simulation AN, wählt das Modul für jeden Tag einen echten Vorbild-Tag desselben Wochentags (ersatzweise Werktag/Wochenende) und spielt dessen Schaltfolge ab — verschoben um einen zufälligen Versatz bis zum eingestellten Maximum. Beim Start wird zuerst der Zustand hergestellt, den das Vorbild um diese Uhrzeit hatte.'],
                 ['type' => 'Label', 'caption' => 'Modus „Nur lernen" sammelt Muster, ohne je zu schalten — praktisch, um einen neuen Kanal erst einmal zu beobachten („📅 Heutigen Ablauf anzeigen" zeigt, was er täte). Modus „Aus" pausiert den Kanal komplett, behält aber das Gelernte.'],
                 ['type' => 'Label', 'caption' => 'Zeitbezug „Sonnenuntergang"/„Sonnenaufgang": Schaltzeiten werden als Abstand zum Sonnenstand gelernt und abgespielt (Beleuchtung folgt so der Dämmerung, nicht der Uhr). Braucht Symcons Location-Control-Instanz (Kernbestandteil, Einstellungen → Standort) — ohne sie gilt automatisch die Uhrzeit.'],
                 ['type' => 'Label', 'caption' => 'Auslöser-Variable (optional): eine Bool-Variable, z. B. „Abwesend", „Urlaub" oder „Alarmanlage scharf". Wird sie TRUE, startet die Simulation; FALSE beendet sie. „Invertiert" dreht das um (für Variablen wie „Anwesend"). Der Schalter „Simulation aktiv" bleibt daneben immer manuell bedienbar.'],
-                ['type' => 'Label', 'caption' => 'Während die Simulation läuft, wird NICHT gelernt — sonst würde Schein seine eigenen Wiedergaben als echtes Verhalten mitlernen. Beim Beenden bleiben die Zielvariablen so stehen, wie sie gerade sind.'],
-                ['type' => 'Label', 'caption' => 'Skripte: IPS_RequestAction(<InstanzID>, \'Active\', true/false) startet/beendet; SCHEIN_Preview(<InstanzID>) liefert den heutigen Ablauf als Text; SCHEIN_ForgetChannel(<InstanzID>, \'Bezeichnung\') verwirft das Gelernte eines Kanals.'],
+                ['type' => 'Label', 'caption' => 'Während die Simulation läuft, wird NICHT gelernt — sonst würde das Modul seine eigenen Wiedergaben als echtes Verhalten mitlernen. Beim Beenden bleiben die Zielvariablen so stehen, wie sie gerade sind.'],
+                ['type' => 'Label', 'caption' => 'Skripte: IPS_RequestAction(<InstanzID>, \'Active\', true/false) startet/beendet; ANWSIM_Preview(<InstanzID>) liefert den heutigen Ablauf als Text; ANWSIM_ForgetChannel(<InstanzID>, \'Bezeichnung\') verwirft das Gelernte eines Kanals.'],
                 ['type' => 'Label', 'caption' => 'Mehrere Instanzen sind erlaubt (z. B. je Etage oder Wohnung). Jede Instanz lernt und spielt unabhängig.'],
             ],
         ];
@@ -1000,9 +1005,9 @@ class Schein extends IPSModule
             'items' => [
                 ['type' => 'Label', 'name' => 'SimStatus', 'caption' => $status],
                 ['type' => 'RowLayout', 'items' => [
-                    ['type' => 'Button', 'caption' => '▶️ Simulation jetzt starten', 'onClick' => 'echo SCHEIN_SetActive($id, true);'],
-                    ['type' => 'Button', 'caption' => '⏹ Simulation beenden', 'onClick' => 'echo SCHEIN_SetActive($id, false);'],
-                    ['type' => 'Button', 'caption' => '📅 Heutigen Ablauf anzeigen', 'onClick' => 'echo SCHEIN_Preview($id);'],
+                    ['type' => 'Button', 'caption' => '▶️ Simulation jetzt starten', 'onClick' => 'echo ANWSIM_SetActive($id, true);'],
+                    ['type' => 'Button', 'caption' => '⏹ Simulation beenden', 'onClick' => 'echo ANWSIM_SetActive($id, false);'],
+                    ['type' => 'Button', 'caption' => '📅 Heutigen Ablauf anzeigen', 'onClick' => 'echo ANWSIM_Preview($id);'],
                 ]],
                 ['type' => 'Label', 'caption' => 'Der Schalter „Simulation aktiv" unter der Instanz tut dasselbe — auch aus WebFront/Kachel, per Ereignis oder Skript.'],
                 ['type' => 'SelectVariable', 'name' => 'TriggerID', 'caption' => 'Auslöser-Variable (optional, Bool)'],
@@ -1078,9 +1083,9 @@ class Schein extends IPSModule
             'type' => 'ExpansionPanel', 'name' => 'ForumHintPanel', 'expanded' => true,
             'caption' => '💬  Rückmeldungen',
             'items' => [
-                ['type' => 'Label', 'caption' => '🧪 Schein ist neu — Fragen, Wünsche oder Fehler sind willkommen (Symcon-Forum bzw. GitHub).'],
+                ['type' => 'Label', 'caption' => '🧪 Die Anwesenheitssimulation ist neu — Fragen, Wünsche oder Fehler sind willkommen (Symcon-Forum bzw. GitHub).'],
                 ['type' => 'Button', 'caption' => 'Zum Repository', 'onClick' => "echo '" . self::REPO_URL . "';", 'link' => true],
-                ['type' => 'Button', 'caption' => 'Verstanden – nicht mehr anzeigen', 'onClick' => 'SCHEIN_AckForumHint($id);'],
+                ['type' => 'Button', 'caption' => 'Verstanden – nicht mehr anzeigen', 'onClick' => 'ANWSIM_AckForumHint($id);'],
             ],
         ];
     }

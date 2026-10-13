@@ -2,7 +2,7 @@
   "elements": [],
   "actions": [],
   "status": [
-    { "code": 102, "icon": "active", "caption": "Aktiv — Kanäle konfiguriert, Schein lernt bzw. spielt ab" },
+    { "code": 102, "icon": "active", "caption": "Aktiv — Kanäle konfiguriert, das Modul lernt bzw. spielt ab" },
     { "code": 104, "icon": "inactive", "caption": "Inaktiv — noch kein Kanal mit gültiger Zielvariable konfiguriert" }
   ]
 }

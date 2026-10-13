@@ -1,6 +1,6 @@
 <?php
 /**
- * test-sim.php — Prüfstand für Schein OHNE laufendes Symcon.
+ * test-sim.php — Prüfstand für die Anwesenheitssimulation OHNE laufendes Symcon.
  *
  * Simuliert IPSModule (Properties/Attribute/Variablen/Timer/Nachrichten) und
  * die benötigten IPS_*-Kernfunktionen, spielt dann vier Lernwochen plus einen
@@ -118,9 +118,9 @@ class IPSModule
     public function simulateResync(): void { $this->attrs = []; $this->Create(); $this->ApplyChanges(); }
 }
 
-require dirname(__DIR__) . '/Schein/module.php';
+require dirname(__DIR__) . '/DG65Anwesenheitssimulation/module.php';
 
-class ScheinTest extends Schein
+class AnwsimTest extends DG65Anwesenheitssimulation
 {
     public float $unit = 0.5;
     public int $index = 0;
@@ -139,11 +139,11 @@ function check(string $what, bool $ok, string $detail = ''): void
 function heading(string $t): void { echo "\n[$t]\n"; }
 function ts(string $s): int { return strtotime($s); }
 function clock(string $s): void { $GLOBALS['CLOCK'] = ts($s); }
-function fire(Schein $m, int $vid, $value): void { $GLOBALS['VARS'][$vid]['value'] = $value; $m->MessageSink($GLOBALS['CLOCK'], $vid, VM_UPDATE, [$value, true, null, $GLOBALS['CLOCK']]); }
+function fire(DG65Anwesenheitssimulation $m, int $vid, $value): void { $GLOBALS['VARS'][$vid]['value'] = $value; $m->MessageSink($GLOBALS['CLOCK'], $vid, VM_UPDATE, [$value, true, null, $GLOBALS['CLOCK']]); }
 function bufCount(int $tid): int { $bid = IPS_GetObjectIDByIdent('buf_' . $tid, 12345); return $bid ? count(json_decode(GetValueString($bid), true)) : -1; }
 function bufFirst(int $tid): array { $bid = IPS_GetObjectIDByIdent('buf_' . $tid, 12345); $b = json_decode(GetValueString($bid), true); return $b[0] ?? []; }
 function actionsSince(int $from): array { return array_values(array_filter($GLOBALS['ACTIONS'], fn($a) => $a[0] >= $from)); }
-function form(Schein $m): array { $f = json_decode($m->GetConfigurationForm(), true); if (!is_array($f)) { throw new RuntimeException('GetConfigurationForm() liefert kein gültiges JSON'); } return $f; }
+function form(DG65Anwesenheitssimulation $m): array { $f = json_decode($m->GetConfigurationForm(), true); if (!is_array($f)) { throw new RuntimeException('GetConfigurationForm() liefert kein gültiges JSON'); } return $f; }
 function formText(array $f): string { return json_encode($f, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); }
 
 // Zielvariablen
@@ -166,7 +166,7 @@ $channels = [
 ];
 
 clock('2026-08-01 12:00:00');
-$m = new ScheinTest();
+$m = new AnwsimTest();
 $m->Create();
 $m->props['Channels'] = json_encode($channels);
 $m->props['TriggerID'] = 200;
@@ -359,7 +359,7 @@ check('Ohne Location Control: ℹ️-Rückfall-Hinweis statt ✅', str_contains(
 $GLOBALS['LOC'] = [10443 => true];
 
 heading('11. Vertrags-Hygiene (SUITE.md Stolperstein 8/20) und onClick-Verdrahtung');
-$rc = new ReflectionClass(Schein::class);
+$rc = new ReflectionClass(DG65Anwesenheitssimulation::class);
 foreach (['SetActive', 'Preview', 'ForgetChannel', 'Tick', 'AckPurposeIntro', 'AckNews', 'AckForumHint'] as $name) {
     $rm = $rc->getMethod($name);
     $okTypes = true; $okDefaults = true;
@@ -370,12 +370,12 @@ foreach (['SetActive', 'Preview', 'ForgetChannel', 'Tick', 'AckPurposeIntro', 'A
     }
     check("$name(): Parameter skalar typisiert, keine PHP-Standardwerte", $okTypes && $okDefaults);
 }
-preg_match_all('/SCHEIN_([A-Za-z]+)\(/', $txt, $mm);
+preg_match_all('/ANWSIM_([A-Za-z]+)\(/', $txt, $mm);
 foreach (array_unique($mm[1]) as $fn) {
-    check("SCHEIN_$fn → public function $fn() existiert", $rc->hasMethod($fn) && $rc->getMethod($fn)->isPublic());
+    check("ANWSIM_$fn → public function $fn() existiert", $rc->hasMethod($fn) && $rc->getMethod($fn)->isPublic());
 }
 check('Kern-Aktionen sind im Formular verdrahtet', count(array_diff(['SetActive', 'Preview'], array_unique($mm[1]))) === 0);
-check('Kein IPS_LogMessage( in module.php (SUITE.md Store-Review Punkt 15, nur $this->LogMessage)', strpos(file_get_contents(dirname(__DIR__) . '/Schein/module.php'), 'IPS_LogMessage(') === false);
+check('Kein IPS_LogMessage( in module.php (SUITE.md Store-Review Punkt 15, nur $this->LogMessage)', strpos(file_get_contents(dirname(__DIR__) . '/DG65Anwesenheitssimulation/module.php'), 'IPS_LogMessage(') === false);
 
 heading('12. Fehlgeschlagene Schaltung landet dauerhaft im Protokoll (über $this->LogMessage)');
 $m->props['Channels'] = json_encode([['Caption' => 'Kaputt', 'TargetID' => 100, 'Mode' => 1, 'TimeRef' => 0, 'JitterMin' => 0]]);

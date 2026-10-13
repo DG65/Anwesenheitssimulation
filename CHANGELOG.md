@@ -3,6 +3,24 @@
 Alle nennenswerten Änderungen an diesem Modul werden hier dokumentiert.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 
+## [0.2.0] - 2026-10-13
+
+### Changed
+- **Umbenennung** (Dietmar, 13.10.2026, DG65-Toolkit-Welle „Funktionsnamen statt Behördenbild",
+  TOOLKIT.md): „Schein" → **„DG65-Toolkit Anwesenheitssimulation"**. Vollständig, weil das Modul
+  bisher nur bei Dietmar läuft: PHP-Klasse und Modulordner `DG65Anwesenheitssimulation` (mit
+  Vorsatz, weil Symcons eigenes Modul `AnwesenheitsSimulation` heißt und PHP-Klassennamen
+  case-insensitiv sind), Präfix `ANWSIM_` statt `SCHEIN_` (`ANWSIM_SetActive`, `ANWSIM_Preview`,
+  `ANWSIM_ForgetChannel`), Repo `DG65/Schein` → `DG65/Anwesenheitssimulation` (GitHub-
+  Weiterleitung bleibt, alter Name wird nie wiederverwendet), genau ein Alias.
+- **GUIDs bleiben** — bestehende Instanzen hängen sich beim Neuregistrieren über dieselbe GUID
+  wieder an, Kanäle (Property) und Lernspeicher (`buf_*`-Variablen) bleiben erhalten. **Verloren
+  gehen beim Modulverwaltungs-Neuregistrieren nur Attribute:** der Tagesplan einer gerade
+  laufenden Simulation (wird beim nächsten Tick neu gewählt) und die weggeklickten Hinweise
+  (Zweck-Intro/Neu/Rückmeldungen erscheinen einmal wieder).
+- Skripte/Ereignisse mit `SCHEIN_…` müssen auf `ANWSIM_…` umgestellt werden (bei Dietmar vor dem
+  Release geprüft: keine vorhanden).
+
 ## [0.1.3] - 2026-10-12
 
 ### Changed
@@ -51,11 +69,11 @@ Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
   eingebaute Location-Control-Instanz (Kernbestandteil), ohne sie automatischer Rückfall auf
   Uhrzeit mit Hinweis im Formular.
 - **Start/Stopp:** Instanzvariable „Simulation aktiv" (mit Aktion — WebFront/Kachel, Ereignis,
-  `IPS_RequestAction`), Formular-Buttons, `SCHEIN_SetActive()`, optionale Auslöser-Variable
+  `IPS_RequestAction`), Formular-Buttons, `ANWSIM_SetActive()`, optionale Auslöser-Variable
   (z. B. Abwesend/Urlaub/Alarm scharf, invertierbar). Während der Simulation wird nicht gelernt.
 - Sichtbare Rückmeldung: Variablen „Letzte Schaltung"/„Nächste Schaltung", Statuszeile und
-  Kanal-Zusammenfassung im Formular, „📅 Heutigen Ablauf anzeigen" (`SCHEIN_Preview()`),
-  `SCHEIN_ForgetChannel()`; fehlgeschlagene Schaltungen dauerhaft im Symcon-Log.
+  Kanal-Zusammenfassung im Formular, „📅 Heutigen Ablauf anzeigen" (`ANWSIM_Preview()`),
+  `ANWSIM_ForgetChannel()`; fehlgeschlagene Schaltungen dauerhaft im Symcon-Log.
 - Formular nach Verbund-Konvention (Zweck-Intro, News, Doku, Rückmeldungen, Über-dieses-Modul),
   Prüfstand `.tools/test-sim.php` (vier Lernwochen + Simulationstag ohne Symcon, läuft in der CI),
   `.tools/check-standalone.php`, PolyForm-Noncommercial-Lizenz.

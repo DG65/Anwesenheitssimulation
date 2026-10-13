@@ -1,19 +1,23 @@
-# Schein — Hinweise für die Arbeit an diesem Repository
+# DG65-Toolkit Anwesenheitssimulation (vormals Schein) — Hinweise für die Arbeit an diesem Repository
 
 ## Einordnung
 
-- **Marke: DG65 Toolkit**, nicht NRG-Stack. Domänenfrei: funktioniert für JEDE schaltbare Variable,
-  unabhängig vom Gewerk. `library.json→name` = „DG65 Toolkit Schein", Alias „Schein" +
-  „Anwesenheitssimulation".
-- **Technischer Name = Anzeigename:** Klasse `Schein`, Präfix `SCHEIN_`, Repo `DG65/Schein`,
-  Ordner `Schein/`. Auf Katasteramts Empfehlung (09.09.2026) bewusst identisch gehalten — die
-  seltene Chance eines brandneuen Moduls ohne Bestandsinstanzen. Ab der ersten echten Instanz
-  eingefroren (TOOLKIT.md-Faustregel, Kernel-Reflection auf den Klassennamen).
+- **Marke: DG65-Toolkit**, nicht NRG-Stack. Domänenfrei: funktioniert für JEDE schaltbare Variable,
+  unabhängig vom Gewerk. `library.json→name` = „DG65-Toolkit Anwesenheitssimulation", genau ein
+  Alias (derselbe Text).
+- **Umbenennung 13.10.2026 (Dietmar, Toolkit-Welle „Funktionsnamen", TOOLKIT.md-Abschnitt
+  „Umbenennung auf Funktionsnamen"):** vormals „Schein" (Klasse `Schein`, Präfix `SCHEIN_`, Repo
+  `DG65/Schein`). Jetzt Klasse + Modulordner **`DG65Anwesenheitssimulation`**, Präfix **`ANWSIM_`**,
+  Repo **`DG65/Anwesenheitssimulation`**, lokaler Ordner `Anwesenheitssimulation/`. **GUIDs
+  unverändert** (Bibliothek `{B4C508FF-…}`, Modul `{00F44496-…}`), Instanz #10795 bei Dietmar
+  blieb erhalten. Der DG65-Vorsatz im Klassennamen ist Pflicht: Symcons eigenes Modul heißt
+  `AnwesenheitsSimulation` (SymconMisc), PHP-Klassennamen sind case-insensitiv. Ab jetzt gilt die
+  Einfrier-Faustregel wieder uneingeschränkt.
 - **Kickoff:** `/Users/dietmar/Nextcloud/Claude/Schein-Kickoff.md` (Destille-Sitzung, 09.09.2026).
   Verbindliche Konventionen: `TOOLKIT.md` (Toolkit-spezifisch) und `SUITE.md` (Symcon-Allgemeines,
   Stolpersteine, Store-Review, Formular-Optik) — beide nur lokal unter `Nextcloud/Claude/`, nicht
   im Repo.
-- **Kein Cross-Modul-Vertrag.** `SCHEIN_SetActive/Preview/ForgetChannel` sind Bedien-Einstiege für
+- **Kein Cross-Modul-Vertrag.** `ANWSIM_SetActive/Preview/ForgetChannel` sind Bedien-Einstiege für
   Skripte/Formular, kein Datenvertrag mit `contractVersion`. Sonnenauf-/-untergang kommt aus
   Symcons Kernmodul Location Control, nicht aus einem Toolkit-Partner (Katasteramt: „erst prüfen,
   ob der Kernel das schon löst, bevor ein Cross-Modul-Vertrag entsteht").
@@ -39,7 +43,7 @@
 
 ## Kernmechanik — nicht verhandelbar
 
-1. **Nie während der Simulation lernen** (`learn()` prüft `isActive()` zuerst). Sonst lernt Schein
+1. **Nie während der Simulation lernen** (`learn()` prüft `isActive()` zuerst). Sonst lernt das Modul
    seine eigenen Wiedergaben. Auch beim Ausbauen nie ein „lernt trotzdem mit"-Flag einführen.
 2. **Nur `$Data[0]` von `VM_UPDATE` verwenden.** Die weiteren Indizes ([1]=geändert?) sind nur
    Community-Vermutung, nicht dokumentiert — `learn()` erkennt Wertänderungen selbst per Vergleich
@@ -84,7 +88,7 @@ php .tools/check-standalone.php   # 0 = kein ungesicherter Fremdaufruf
 ```
 
 Der Prüfstand simuliert `IPSModule` + IPS-Kernfunktionen mit steuerbarer Uhr und Zufall
-(`ScheinTest` überschreibt `now()`/`randomUnit()`/`randomIndex()`). Live-Test in Symcon bleibt
+(`AnwsimTest` überschreibt `now()`/`randomUnit()`/`randomIndex()`). Live-Test in Symcon bleibt
 Pflicht vor jedem Release: Installation nur manuell über die Modulverwaltung, Formular durchklicken,
 jeden Button auf sichtbare Rückmeldung prüfen, mindestens einen Abend echt abspielen lassen.
 

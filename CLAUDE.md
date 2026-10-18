@@ -50,7 +50,10 @@
    mit dem letzten Puffer-Eintrag.
 3. **Lernspeicher = versteckte String-Variable `buf_<TargetID>`** unter der Instanz (kein Attribut,
    überlebt Modul-Resync; Schlüssel ist die Zielvariable, nicht die Bezeichnung — Umbenennen
-   verliert nichts). Verwaiste Puffer räumt `ApplyChanges()` über den Ident-Präfix auf.
+   verliert nichts). Verwaiste Puffer räumt `ApplyChanges()` über den Ident-Präfix auf — **nur
+   wenn der Kanal nicht mehr in der Liste steht**, nie weil die Zielvariable gerade fehlt (seit
+   0.2.1, SUITE.md Store-Review Punkt 17: Fremdmodule legen Variablen beim Start/Update neu an).
+   Vor `KR_READY` fasst `ApplyChanges()` nichts an, sondern wartet auf `IPS_KERNELMESSAGE`.
    `ReplayPlan` (Tagesplan) ist dagegen bewusst ein Attribut: geht es verloren, wählt der nächste
    Tick einfach neu.
 4. **Einschwingen statt Nachspielen:** beim Start/Tageswechsel nur die letzte fällige Schaltung je

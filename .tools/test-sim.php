@@ -34,7 +34,9 @@ function mkvar(int $id, int $type, $value, string $name, string $ident = '', int
 {
     $GLOBALS['VARS'][$id] = ['type' => $type, 'value' => $value, 'name' => $name, 'ident' => $ident, 'parent' => $parent, 'hidden' => false, 'action' => $action];
 }
-function IPS_GetKernelRunlevel(): int { return KR_READY; }
+$GLOBALS['RUNLEVEL'] = KR_READY; // im Block "Symcon-Start" vorübergehend KR_INIT
+const KR_INIT = 10102;
+function IPS_GetKernelRunlevel(): int { return $GLOBALS['RUNLEVEL']; }
 function IPS_VariableExists($id): bool { return isset($GLOBALS['VARS'][(int)$id]); }
 function IPS_GetVariable($id): array { return ['VariableType' => $GLOBALS['VARS'][(int)$id]['type']]; }
 function GetValue($id) { return $GLOBALS['VARS'][(int)$id]['value']; }
@@ -376,6 +378,37 @@ foreach (array_unique($mm[1]) as $fn) {
 }
 check('Kern-Aktionen sind im Formular verdrahtet', count(array_diff(['SetActive', 'Preview'], array_unique($mm[1]))) === 0);
 check('Kein IPS_LogMessage( in module.php (SUITE.md Store-Review Punkt 15, nur $this->LogMessage)', strpos(file_get_contents(dirname(__DIR__) . '/DG65Anwesenheitssimulation/module.php'), 'IPS_LogMessage(') === false);
+
+heading('13. Symcon-Start und fehlende Zielvariable: Lernspeicher nie vorschnell löschen (SUITE.md Store-Review Punkt 17)');
+$m->props['Channels'] = json_encode($channels);
+$m->ApplyChanges();
+clock('2026-09-08 12:00:00'); fire($m, 101, true);
+$bufBefore = bufCount(101);
+check('Vorbereitung: Küche hat Gelerntes', $bufBefore > 0, (string)$bufBefore);
+// (a) ApplyChanges VOR KR_READY: nichts anfassen, nur auf Kernel-Nachricht warten
+$GLOBALS['RUNLEVEL'] = KR_INIT;
+$m->messages = [];
+$m->ApplyChanges();
+check('Vor KR_READY: nur IPS_KERNELMESSAGE (Sender 0) registriert, keine VM_UPDATE-Registrierung', isset($m->messages[0][IPS_KERNELMESSAGE]) && count($m->messages) === 1, json_encode(array_keys($m->messages)));
+check('Vor KR_READY: alle Lernspeicher unangetastet', bufCount(101) === $bufBefore && bufCount(100) >= 0 && IPS_GetObjectIDByIdent('buf_104', 12345) !== false);
+$GLOBALS['RUNLEVEL'] = KR_READY;
+$m->MessageSink($GLOBALS['CLOCK'], 0, IPS_KERNELMESSAGE, [KR_READY]);
+check('KR_READY-Nachricht holt ApplyChanges nach: VM_UPDATE-Registrierungen da', isset($m->messages[101][VM_UPDATE]) && isset($m->messages[200][VM_UPDATE]));
+// (b) Zielvariable vorübergehend weg (Fremdmodul legt neu an): Puffer bleibt, Kanal pausiert
+$saved = $GLOBALS['VARS'][101]; unset($GLOBALS['VARS'][101]);
+$m->ApplyChanges();
+check('Zielvariable fehlt: Lernspeicher bleibt erhalten', IPS_GetObjectIDByIdent('buf_101', 12345) !== false && bufCount(101) === $bufBefore, (string)bufCount(101));
+check('Zielvariable fehlt: keine VM_UPDATE-Registrierung auf die tote ID, Status bleibt 102 (andere Kanäle laufen)', !isset($m->messages[101]) && $m->status === 102);
+$GLOBALS['VARS'][101] = $saved;
+$m->ApplyChanges();
+check('Zielvariable wieder da: Kanal lernt weiter mit altem Gelernten', isset($m->messages[101][VM_UPDATE]) && bufCount(101) === $bufBefore);
+// (c) Kanal wirklich aus der Liste entfernt → Puffer weg
+$m->props['Channels'] = json_encode(array_values(array_filter($channels, fn($c) => $c['TargetID'] !== 101)));
+$m->ApplyChanges();
+check('Kanal aus Liste entfernt: Lernspeicher gelöscht', IPS_GetObjectIDByIdent('buf_101', 12345) === false);
+$m->props['Channels'] = json_encode($channels);
+$m->ApplyChanges();
+check('Keine Presentation-OPTIONS im Modul (Farbschlüssel-Falle SUITE.md Stolperstein 9 kann nicht greifen)', !preg_match('/PRESENTATION|OPTIONS|ColorValue|ColorActive/', file_get_contents(dirname(__DIR__) . '/DG65Anwesenheitssimulation/module.php')));
 
 heading('12. Fehlgeschlagene Schaltung landet dauerhaft im Protokoll (über $this->LogMessage)');
 $m->props['Channels'] = json_encode([['Caption' => 'Kaputt', 'TargetID' => 100, 'Mode' => 1, 'TimeRef' => 0, 'JitterMin' => 0]]);

@@ -63,6 +63,9 @@ class DG65Anwesenheitssimulation extends IPSModule
         '0.2.0' => [
             '• Das Modul heißt jetzt „DG65-Toolkit Anwesenheitssimulation" (vormals „Schein"); Skript-Funktionen beginnen mit ANWSIM_ statt SCHEIN_ (z. B. ANWSIM_Preview). Instanzen, Kanäle und Gelerntes bleiben erhalten.',
         ],
+        '0.2.1' => [
+            '• Gelerntes bleibt auch dann erhalten, wenn eine Zielvariable vorübergehend fehlt (z. B. während ein Geräte-Modul seine Variablen neu anlegt). Gelöscht wird ein Lernspeicher nur noch, wenn der Kanal aus der Liste entfernt wird.',
+        ],
     ];
     private const REPO_URL     = 'https://github.com/DG65/Anwesenheitssimulation';
     private const LICENSE_URL  = 'https://github.com/DG65/Anwesenheitssimulation/blob/main/LICENSE';
@@ -136,10 +139,15 @@ class DG65Anwesenheitssimulation extends IPSModule
         $this->MaintainVariable('NextAction', 'Nächste Schaltung', VARIABLETYPE_STRING, '', 2, true);
 
         $channels = $this->channels();
-        $validTargets = [];
+        $validTargets = [];      // Zielvariable existiert gerade → lernen/abspielen
+        $configuredTargets = []; // steht in der Kanalliste → Lernspeicher behalten
         foreach ($channels as $ch) {
             $tid = (int)($ch['TargetID'] ?? 0);
-            if ($tid <= 0 || !IPS_VariableExists($tid)) {
+            if ($tid <= 0) {
+                continue;
+            }
+            $configuredTargets[$tid] = true;
+            if (!IPS_VariableExists($tid)) {
                 continue;
             }
             $validTargets[$tid] = true;
@@ -149,16 +157,20 @@ class DG65Anwesenheitssimulation extends IPSModule
             }
         }
 
-        // Ringpuffer verwaister Kanäle (Zeile gelöscht / Zielvariable
-        // gewechselt) entfernen — ein Wechsel der Bezeichnung lässt den
-        // Puffer dagegen unangetastet (Schlüssel ist die Zielvariable).
+        // Ringpuffer verwaister Kanäle entfernen — aber NUR, wenn die Zeile
+        // aus der Kanalliste verschwunden ist (bzw. die Zielvariable
+        // gewechselt wurde). Fehlt die Zielvariable bloß vorübergehend
+        // (Fremdmodul legt seine Variablen beim Start/Update neu an), bleibt
+        // das Gelernte erhalten — "im Zweifel nie löschen" (SUITE.md
+        // Store-Review Punkt 17). Ein Wechsel der Bezeichnung lässt den
+        // Puffer ohnehin unangetastet (Schlüssel ist die Zielvariable).
         foreach (IPS_GetChildrenIDs($this->InstanceID) as $cid) {
             $ident = IPS_GetObject($cid)['ObjectIdent'] ?? '';
             if (strpos($ident, 'buf_') !== 0) {
                 continue;
             }
             $tid = (int)substr($ident, 4);
-            if (!isset($validTargets[$tid])) {
+            if (!isset($configuredTargets[$tid])) {
                 IPS_DeleteVariable($cid);
             }
         }

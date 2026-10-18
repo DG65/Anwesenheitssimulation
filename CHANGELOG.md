@@ -3,6 +3,18 @@
 Alle nennenswerten Änderungen an diesem Modul werden hier dokumentiert.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 
+## [0.2.1] - 2026-10-18
+
+### Changed
+- Lernspeicher (`buf_*`) werden nur noch gelöscht, wenn der Kanal aus der Liste entfernt oder
+  seine Zielvariable gewechselt wurde — nicht mehr, wenn die Zielvariable bloß vorübergehend
+  fehlt (z. B. weil ein Geräte-Modul beim Start/Update seine Variablen neu anlegt). „Im Zweifel
+  nie löschen", SUITE.md Store-Review-Checkliste Punkt 17 (EMS-Rundruf 18.10.2026). Der
+  `KR_READY`-Wächter vor jeder Löschung war schon da; der Prüfstand deckt beides jetzt ab
+  (Block 13: Start vor KR_READY, fehlende/zurückkehrende Zielvariable, echte Entfernung).
+- Geprüft, nicht betroffen: keine Presentation-OPTIONS im Modul (SUITE.md Stolperstein 9,
+  Farbschlüssel je Darstellung) — nur klassische Profile; Prüfstand wacht darüber.
+
 ## [0.2.0] - 2026-10-13
 
 ### Changed

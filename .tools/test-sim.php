@@ -410,6 +410,22 @@ $m->props['Channels'] = json_encode($channels);
 $m->ApplyChanges();
 check('Keine Presentation-OPTIONS im Modul (Farbschlüssel-Falle SUITE.md Stolperstein 9 kann nicht greifen)', !preg_match('/PRESENTATION|OPTIONS|ColorValue|ColorActive/', file_get_contents(dirname(__DIR__) . '/DG65Anwesenheitssimulation/module.php')));
 
+heading('14. Lernfenster gilt auch beim Lesen (Kanal ohne neue Ereignisse, Live-Fund 23.10.2026)');
+$m->props['Channels'] = json_encode($channels);
+$m->ApplyChanges();
+clock('2026-09-08 12:00:00'); fire($m, 104, true); clock('2026-09-08 13:00:00'); fire($m, 104, false);
+$rawTerrasse = count(json_decode(GetValueString(IPS_GetObjectIDByIdent('buf_104', 12345)), true));
+check('Vorbereitung: Außenlicht hat Roh-Ereignisse vom 08.09. im Speicher', $rawTerrasse === 2, (string)$rawTerrasse);
+clock('2026-09-30 12:00:00');
+check('Innerhalb des Fensters (30.09., Fenster ab 02.09.): Außenlicht hat ein Vorbild', preg_match('/• Außenlicht \(Vorbild/', $m->Preview()) === 1, $m->Preview());
+clock('2026-10-20 12:00:00'); // Fenster ab 22.09. — Terrasse hat seitdem nichts mehr gelernt
+$p = $m->Preview();
+check('Preview: Außenlicht „noch nichts gelernt" statt veraltetem Vorbild-Tag', preg_match('/• Außenlicht.*noch nichts gelernt/', $p) === 1, $p);
+$f = form($m); $sum = ''; $walk = function ($items) use (&$walk, &$sum) { foreach ($items as $e) { if (($e['name'] ?? '') === 'ChannelSummary') { $sum = $e['caption']; } if (isset($e['items'])) { $walk($e['items']); } } }; $walk($f['elements']);
+check('Kanal-Zusammenfassung zählt für Außenlicht nichts Veraltetes', str_contains($sum, 'Außenlicht: noch nichts gelernt'), $sum);
+check('Rohspeicher bleibt unangetastet (nur lesend getrimmt, Lernen räumt später auf)', count(json_decode(GetValueString(IPS_GetObjectIDByIdent('buf_104', 12345)), true)) === $rawTerrasse);
+clock('2026-09-08 12:00:00');
+
 heading('12. Fehlgeschlagene Schaltung landet dauerhaft im Protokoll (über $this->LogMessage)');
 $m->props['Channels'] = json_encode([['Caption' => 'Kaputt', 'TargetID' => 100, 'Mode' => 1, 'TimeRef' => 0, 'JitterMin' => 0]]);
 $m->ApplyChanges();

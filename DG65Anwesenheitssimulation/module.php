@@ -66,6 +66,9 @@ class DG65Anwesenheitssimulation extends IPSModule
         '0.2.1' => [
             '• Gelerntes bleibt auch dann erhalten, wenn eine Zielvariable vorübergehend fehlt (z. B. während ein Geräte-Modul seine Variablen neu anlegt). Gelöscht wird ein Lernspeicher nur noch, wenn der Kanal aus der Liste entfernt wird.',
         ],
+        '0.2.2' => [
+            '• Das Lernfenster gilt jetzt auch für Kanäle, die länger nicht geschaltet wurden: veraltete Tage werden weder als Vorbild gewählt noch in der Kanal-Zusammenfassung gezählt.',
+        ],
     ];
     private const REPO_URL     = 'https://github.com/DG65/Anwesenheitssimulation';
     private const LICENSE_URL  = 'https://github.com/DG65/Anwesenheitssimulation/blob/main/LICENSE';
@@ -407,7 +410,12 @@ class DG65Anwesenheitssimulation extends IPSModule
     private function trim(array $buffer, int $now): array
     {
         $days = max(1, $this->ReadPropertyInteger('LearnDays'));
-        $cutoff = strtotime('-' . $days . ' days', $now); // kein +86400-Rechnen (SUITE.md Stolperstein 18)
+        // Fenstergrenze = TAGESANFANG vor N Tagen, nicht "jetzt minus N Tage":
+        // ein Vorbild-Tag liegt so entweder ganz im Fenster oder ganz
+        // draußen — rollte die Grenze minütlich, fielen die späten
+        // Ereignisse des ältesten Tags mitten im Abspielen heraus.
+        // Kein +86400-Rechnen (SUITE.md Stolperstein 18).
+        $cutoff = strtotime(date('Y-m-d', strtotime('-' . $days . ' days', $now)) . ' 00:00:00');
         $buffer = array_values(array_filter($buffer, function ($e) use ($cutoff) {
             return (int)($e['t'] ?? 0) >= $cutoff;
         }));
@@ -613,7 +621,10 @@ class DG65Anwesenheitssimulation extends IPSModule
         $dayStart = strtotime($ymd . ' 00:00:00');
         $value = null;
         $best = 0;
-        foreach ($this->buffer($tid) as $ev) {
+        // Bewusst der ROHspeicher: gesucht ist der Zustand VOR dem
+        // Vorbild-Tag — liegt der am Fensterrand, steht das letzte Ereignis
+        // davor schon außerhalb des Fensters und wäre im getrimmten Puffer weg.
+        foreach ($this->rawBuffer($tid) as $ev) {
             $t = (int)$ev['t'];
             if ($t < $dayStart && $t >= $best) {
                 $best = $t;
@@ -793,7 +804,21 @@ class DG65Anwesenheitssimulation extends IPSModule
         return $bid;
     }
 
+    /**
+     * Gelernte Ereignisse eines Kanals — IMMER auf das Lernfenster
+     * zugeschnitten, auch beim Lesen. Getrimmt wird sonst nur beim Lernen
+     * (learn()); ein Kanal ohne neue Ereignisse behielte seine veralteten
+     * Tage und böte sie weiter als Vorbild an (live gefunden 23.10.2026:
+     * „5 Schaltvorgänge seit 13.09." bei einem Fenster ab 25.09.).
+     * Nur lesen, nicht zurückschreiben — der nächste Lernvorgang räumt auf.
+     */
     private function buffer(int $tid): array
+    {
+        return $this->trim($this->rawBuffer($tid), $this->now());
+    }
+
+    /** Ungetrimmter Lernspeicher — nur für stateBefore(), sonst buffer() verwenden. */
+    private function rawBuffer(int $tid): array
     {
         $bid = $this->bufferID($tid);
         if (!$bid) {

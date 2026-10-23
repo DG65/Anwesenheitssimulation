@@ -63,6 +63,11 @@
    fressen (im Prüfstand mit absichtlich rückwärts laufender Uhr gefunden).
 6. **Kalenderrechnung DST-sicher** (SUITE.md Stolperstein 18): `mktime()`/`strtotime('-N days')`,
    nie `±86400`.
+6a. **Lernfenster: Grenze = Tagesanfang vor N Tagen, und es gilt auch beim LESEN** (0.2.2,
+   Live-Fund 23.10.2026). `buffer()` liefert immer den getrimmten Stand (Vorbild-Wahl,
+   Zusammenfassung, Abspielen), `rawBuffer()` nur für `stateBefore()` (Zustand vor dem
+   Vorbild-Tag liegt am Fensterrand außerhalb). Nie die Grenze minütlich rollen lassen — sonst
+   verliert der älteste Vorbild-Tag seine späten Ereignisse während des Abspielens.
 7. **Schalten:** `HasAction()` → `RequestAction($vid, $wert)`, sonst `SetValue()`; Wert per
    `castForVariable()` auf den Variablentyp. Fehlschlag → `$this->LogMessage(…, KL_WARNING)`
    (dauerhaft), nicht nur `SendDebug()`. **Nie `IPS_LogMessage()` in der Modulklasse** (SUITE.md

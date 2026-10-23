@@ -3,6 +3,21 @@
 Alle nennenswerten Änderungen an diesem Modul werden hier dokumentiert.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 
+## [0.2.2] - 2026-10-23
+
+### Fixed
+- Das Lernfenster griff nur beim Lernen (Trimmen beim Schreiben). Ein Kanal, der länger nicht
+  geschaltet wurde, behielt veraltete Tage und bot sie als Vorbild-Tag an; die Kanal-
+  Zusammenfassung zählte sie mit (live: „Wohnzimmer: 5 Schaltvorgänge seit 13.09." bei einem
+  Fenster ab 25.09.). Jetzt wird das Fenster auch beim Lesen angewendet — nur lesend, der
+  Rohspeicher bleibt bis zum nächsten Lernvorgang unverändert. Prüfstand Block 14.
+- Dabei präzisiert: Die Fenstergrenze ist der **Tagesanfang** vor N Tagen, nicht „jetzt minus
+  N Tage". Ein Vorbild-Tag liegt damit ganz im Fenster oder ganz draußen — bei minütlich
+  rollender Grenze wären die späten Ereignisse des ältesten Tags mitten im Abspielen
+  herausgefallen (im Prüfstand sofort sichtbar: Wohnzimmer-„Aus" um 23:35 fehlte). Das
+  Einschwingen (`stateBefore()`) liest bewusst den Rohspeicher, weil es den Zustand VOR dem
+  Vorbild-Tag braucht, der am Fensterrand bereits außerhalb liegt.
+
 ## [0.2.1] - 2026-10-18
 
 ### Changed

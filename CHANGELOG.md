@@ -3,6 +3,119 @@
 Alle nennenswerten Änderungen an diesem Modul werden hier dokumentiert.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 
+## [0.3.0] - 2026-11-17
+
+### Added
+- **Vorschläge aus dem Archiv** (17.11.2026): „🔎 Passende Variablen suchen" bzw.
+  `ANWSIM_Discover()` listet geloggte Bool-Variablen mit Aktion, die im Lernfenster an mindestens
+  drei Tagen geschaltet wurden (höchstens 150 Schaltungen je Tag, sonst ist es ein Takt). Vor-angehakt
+  ist nur, was nach Beleuchtung aussieht; Wallbox, Fahrzeug & Co. stehen ungehakt darunter.
+  „➕ Angehakte als Kanäle übernehmen" (`ANWSIM_AddSuggestions()`) hängt sie an die Kanalliste im
+  offenen Formular — gespeichert wird erst mit „Übernehmen" (keine Selbstpersistenz), danach kommt
+  der Schaltverlauf sofort aus dem Archiv. Bezeichnung = Gerätename, bei Doppelungen mit
+  Variablennamen. Live nachgestellt: 81 Kandidaten, 7000 Archivwerte, 97 ms.
+  Gefunden werden auch **Dimmer und Rollläden** (Zahl-Variablen mit Aktion, erkannt am Profil
+  `~Intensity…`/`~Shutter…` oder am Namen; andere schaltbare Zahlen wie Sollwerte oder Ladeströme
+  nicht). Spalte „Art"; vor-angehakt sind Lichter und Dimmer, Rollläden nicht. Eine Fahrt mit
+  Zwischenwerten zählt als ein Schaltvorgang.
+- **Meldung aufs Handy** (17.11.2026): optional Push an Kachel-Visualisierung/WebFront, wenn eine
+  Schaltung fehlschlägt (`NotifyFailure`, höchstens einmal je Kanal und Tag) oder die Simulation
+  startet/endet (`NotifyStartStop`); Ziele wählbar (`NotifyTargets`, leer = alle), Probemeldung
+  per Knopf bzw. `ANWSIM_TestNotification()`. Vorgabe: aus. Technik nach SUITE.md
+  (`VISU_PostNotificationEx`, Titel/Text byte-sicher gekürzt).
+- **Kanalübersicht:** je Kanal die gelernten Vorbild-Tage je Wochentag („Mo 4 · Di 4 · … · So –")
+  und eine Warnung, wenn dieselbe Zielvariable in zwei Zeilen steht (die zweite wird ignoriert,
+  damit nicht doppelt geschaltet wird).
+- **Auslöser erweitert:** neben Bool- jetzt auch Zahl- und Text-Variablen (z. B. ein Hausmodus) mit
+  Werteliste `TriggerValues`; **Startverzögerung** `TriggerDelay` in Minuten (zweiter Zeitgeber,
+  `ANWSIM_TriggerDelayElapsed()`), damit ein kurzer Einkauf nichts startet. Beenden wirkt sofort.
+  Das Formular zeigt, was der Auslöser gerade sagt (formatierter Wert, Rohwert, Wirkung).
+- **Ende der Simulation wählbar** (`EndAction`): alles lassen (Vorgabe, wie bisher), Zustand von vor
+  dem Start wiederherstellen oder alle abgespielten Kanäle ausschalten. Geschaltet wird nur, was
+  abweicht und was die Simulation heute tatsächlich abgespielt hat; ist der Startzustand unbekannt
+  (Modul-Resync während der Simulation), wird nichts geschaltet.
+- **Variable „Heutiger Ablauf"** (`Schedule`, `~HTMLBox`) für die Visualisierung: je Kanal
+  Vorbild-Tag, aktueller Stand mit Uhrzeit, nächster Stand mit Uhrzeit. Kanalnamen HTML-sicher.
+- **Feiertage wie Sonntage** (Dietmar, 17.11.2026): Eigenschaft `HolidayRegion` (16 Bundesländer,
+  Österreich, Schweiz; Vorgabe: nicht berücksichtigen). Gilt für „heute" UND für gelernte Tage.
+  Rechenregeln wie im DG65-Toolkit Automat, bewusst kopiert (jedes Toolkit-Modul läuft allein).
+- **Geräte, die nie geschaltet werden** (Dietmar, 17.11.2026: „die gefährlichen Dinge wie Toaster,
+  Bügeleisen etc. schalten einfach lassen"): Wortliste `BlockedWords`, vorbelegt mit Wärmegeräten
+  Kühl- und Gefriergeräten sowie Türschlössern, Garagentoren und Markisen, vom Nutzer änderbar.
+  Passt ein Wort auf Kanalbezeichnung, Variablenname, Gerätename oder Profil, wird der Kanal nie abgespielt und nie vorgeschlagen; Vorschau und
+  Kanal-Zusammenfassung sagen es mit dem Wort (⛔). Lange Wörter passen auch als Wortteil, kurze
+  (unter 7 Buchstaben) nur am Wortanfang, damit „Heater" kein „Theater" sperrt. Gelernt wird weiter.
+  Am Live-System gegengeprüft: Toaster, Bügeleisen und Kaffeemaschine sind dort schaltbare,
+  geloggte Steckdosen und werden von der Liste erfasst; ebenso das Türschloss der Haustüre
+  (Profil `~DoorLockMode.ZWave`), die Markise und „Verriegelt" am Fahrzeug.
+- **Zweisprachig Deutsch/Englisch** (Dietmar, 05.11.2026, SUITE.md Konventionen Punkt 9): alle
+  sichtbaren Texte — Formular, Rückmeldungen, Variablennamen, Statuszeilen, Protokollmeldung,
+  „Neu"-Panel — als englische Quelltexte im Code, Deutsch in `locale.json` (wortgleich zum
+  bisherigen Stand). Dazu `README.en.md`. Das Modul folgt der Sprache der Symcon-Installation.
+- Übersetzung nach dem Automat-Muster (SUITE.md Stolperstein 24): die Sprache wird einmal pro
+  PHP-Lauf ermittelt und die Tabelle selbst gelesen — kein `Translate()`-Aufruf je Text im
+  minütlichen Tick.
+- Kennungen unverändert (Idents, Properties, Attribute, `ANWSIM_`-Funktionen, Listenfelder);
+  bestehende Instanzen verlieren nichts. Bereits angelegte Variablen behalten ihre deutschen
+  Namen (Symcon benennt nur bei Neuanlage).
+- Prüfstand: läuft weiter auf Deutsch (alle bisherigen Prüfungen unverändert), neuer Block 15
+  erzeugt Formular, Vorschau und Rückmeldungen auf Englisch und prüft sie auf deutsche Reste;
+  statisch: jeder `t()`-Text steht in `locale.json`, Platzhalter stimmen überein, keine Umlaute
+  in Code-Zeichenketten.
+
+- **Archiv-Import (Dietmars Idee, 17.11.2026):** Wird eine Zielvariable im Symcon-Archiv geloggt,
+  übernimmt das Modul ihren Schaltverlauf für das Lernfenster — bei neuen Kanälen automatisch,
+  bei bestehenden über „📥 Lernspeicher aus dem Archiv füllen" bzw. `ANWSIM_ImportArchive()`.
+  Gefüllt wird nur die Zeit VOR den selbst gelernten Daten (nichts wird ersetzt oder verdoppelt);
+  Zeiten, in denen die Simulation lief, werden übersprungen; die Sonnen-Anker werden aus dem
+  Standort der Location Control berechnet (`date_sun_info`, live sekundengleich mit deren Werten).
+  Damit ist das Modul bei geloggten Variablen am ersten Tag nutzbar.
+- **Mindestzahl Schaltvorgänge je Vorbild-Tag** (neue Einstellung `MinDayEvents`, Standard 4, alle
+  Kanäle zusammen): ein Tag, an dem kaum geschaltet wurde, dient nicht als Vorbild. Erreicht kein
+  Tag die Mindestzahl, gelten die vorhandenen Tage, mit Hinweis in Vorschau und Start-Meldung.
+
+### Fixed
+- **Erste echte Schaltung nach einer Simulation:** Der Lernspeicher kennt nur den Stand von vor der
+  Abwesenheit. Hatte die Wiedergabe (oder die neue Endaktion) einen Kanal anders hinterlassen, ging
+  die erste echte Schaltung nach der Rückkehr als „keine Änderung" verloren. Jetzt merkt sich das
+  Modul den Stand jedes Kanals am Ende der Simulation (Attribut `EndState`) und vergleicht die
+  erste Meldung danach damit. Dadurch wird auch die späte Rückmeldung einer Endaktion nicht als
+  echtes Verhalten gelernt.
+- **Lange Abwesenheit:** Bisher lief das Modul leer, sobald die Abwesenheit länger dauerte als das
+  Lernfenster (nachgestellt: ab Abwesenheitstag 29 keine Schaltung mehr), weil während der
+  Simulation nicht gelernt wird und das Fenster weiterrollte. Jetzt zählt die Zeit, in der die
+  Simulation lief, nicht zum Fenster: es steht während der Simulation still, und nach der Rückkehr
+  sind die Tage vor der Abreise noch da. Die Simulationszeiten liegen in der versteckten Variable
+  `SimPeriods` (überlebt einen Modul-Resync, anders als ein Attribut).
+- **Sekundengenau statt Minutentakt:** Der Timer wird auf die nächste Schaltzeit gestellt
+  (spätestens nach 10 Minuten bzw. zum Tageswechsel). An/Aus-Folgen innerhalb derselben Minute
+  hoben sich bisher unsichtbar auf; jetzt werden sie so abgespielt, wie sie gelernt wurden. Sind
+  nach einem Ausfall mehrere Schaltungen eines Kanals fällig, wird nur die letzte ausgeführt.
+- Nach einem Modul-Resync während laufender Simulation zeigt das Formular wieder das richtige
+  „seit …" (aus `SimPeriods` wiederhergestellt).
+
+### Changed
+- Debug-Ausgaben (`SendDebug`) sind Entwickler-Kanal und jetzt durchgehend englisch.
+- Store-Checkliste 25 (Review-Auswertung 06.11.2026): statische Formulartexte werden NICHT vom
+  Modul übersetzt — die Konsole übersetzt Captions, Labels, Suffixe und Optionen selbst über
+  `locale.json`. Selbst übersetzt werden nur Texte mit eingesetzten Werten (Statuszeile,
+  Kanal-Zusammenfassung, Versionszeile, „Neu bis Version X"), Variablennamen und Rückmeldungen.
+  Der Prüfstand bildet die Konsolen-Übersetzung nach und prüft, dass jeder statische Caption in
+  `locale.json` steht.
+- Store-Checkliste 26: verwaiste Lernspeicher werden mit `$this->UnregisterVariable()` statt
+  `IPS_DeleteVariable()` entfernt.
+- Store-Vorprüfung (17.11.2026): die Lernspeicher-Variablen werden nur noch bei der Neuanlage
+  versteckt, nicht mehr bei jedem Übernehmen — wer sie einblendet, behält das. README und
+  CHANGELOG stellen Symcons eigenes Modul „Anwesenheits-Simulation" jetzt richtig dar (arbeitet
+  mit archivierten Schaltvorgängen; die frühere Aussage „an IPSLight gekoppelt" war falsch).
+- Gegen Checkliste 27–29 geprüft, nicht betroffen: kein Instanz-Abgleich in `ApplyChanges()`
+  (Location Control nur in Formular/Lernen/Abspielen nach `KR_READY`), nur Standardprofile
+  `~Switch` und `~HTMLBox` per `MaintainVariable()`, kein Logging-Schalter.
+- Formular: Das Panel „Simulation" hat zwei Untergruppen („Start und Ende", „Lernen und
+  Vorbild-Tag"). Es bleibt bei zwei Fachpanels auf oberster Ebene.
+- Die Beschriftung der Umkehr-Option heißt jetzt „Auslöser umkehren" (Eigenschaft `TriggerInvert`
+  unverändert).
+
 ## [0.2.2] - 2026-10-23
 
 ### Fixed
@@ -79,8 +192,8 @@ Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 
 ### Added
 - Erstes Release. Anwesenheitssimulation für JEDE schaltbare Symcon-Variable (Bool/Integer/Float,
-  z. B. Licht, Steckdose, Rollladen, Radio), unabhängig vom liefernden Modul — nicht an IPSLight
-  gekoppelt wie Symcons Bordmittel.
+  z. B. Licht, Steckdose, Rollladen, Radio), unabhängig vom liefernden Modul und ohne
+  Symcon-Archiv.
 - **Lernen** ohne Symcon-Archiv: jede echte Wertänderung einer Zielvariable (per `VM_UPDATE`,
   kein Polling) landet mit Zeitstempel in einem versteckten Lernspeicher je Kanal; rollendes
   Lernfenster (Standard 28 Tage) — das Muster folgt so der Jahreszeit von selbst. Schreibvorgänge
@@ -107,6 +220,6 @@ Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 
 ### Herkunft
 - Kandidat aus der DG65-Toolkit-Ideenrunde (Recherche der Destille-Sitzung, 08.09.2026:
-  Symcon-Bordmittel an IPSLight gekoppelt und als unzuverlässig gemeldet, ioBroker ohne Adapter,
+  Forenberichte über Probleme mit vorhandenen Lösungen, ioBroker ohne Adapter,
   Home Assistant mit mehreren Blueprints als Beleg für den Wert des Konzepts). Kickoff-Briefing
   `Schein-Kickoff.md`.

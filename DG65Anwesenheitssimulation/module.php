@@ -91,8 +91,15 @@ class DG65Anwesenheitssimulation extends IPSModule
             '• Suggestions now also find dimmers and shutters.',
             '• Channel overview: shows per weekday how many reference days are learned, and warns if a target variable is used twice.',
         ],
+        '0.3.1' => [
+            '• 💬 The module now has its own thread in the Symcon forum — the feedback panel and the documentation link to it.',
+        ],
     ];
     private const REPO_URL     = 'https://github.com/DG65/Anwesenheitssimulation';
+    // Modul-Thread im Symcon-Forum. FORUM_THREAD ist der Stand des Hinweises: Wer den Hinweis früher
+    // weggeklickt hat (als es noch keinen Thread gab), bekommt ihn mit dem Link einmal wieder.
+    private const FORUM_URL    = 'https://community.symcon.de/t/144973';
+    private const FORUM_THREAD = 'thread-144973';
     private const LICENSE_URL  = 'https://github.com/DG65/Anwesenheitssimulation/blob/main/LICENSE';
     private const PAYPAL_URL   = 'https://paypal.me/DietmarGureth';
 
@@ -190,7 +197,8 @@ class DG65Anwesenheitssimulation extends IPSModule
         // Dismiss-Zustände der Rahmen-Panels.
         $this->RegisterAttributeBoolean('PurposeIntroGone', false);
         $this->RegisterAttributeString('SeenNews', '');
-        $this->RegisterAttributeBoolean('ForumHintGone', false);
+        $this->RegisterAttributeBoolean('ForumHintGone', false); // Altbestand (bis 0.3.0), bleibt registriert
+        $this->RegisterAttributeString('ForumHintSeen', '');
 
         $this->RegisterTimer('Tick', 0, 'ANWSIM_Tick($_IPS[\'TARGET\']);');
         $this->RegisterTimer('StartDelay', 0, 'ANWSIM_TriggerDelayElapsed($_IPS[\'TARGET\']);');
@@ -2051,6 +2059,7 @@ class DG65Anwesenheitssimulation extends IPSModule
     public function AckForumHint(): void
     {
         $this->WriteAttributeBoolean('ForumHintGone', true);
+        $this->WriteAttributeString('ForumHintSeen', self::FORUM_THREAD);
         $this->UpdateFormField('ForumHintPanel', 'visible', false);
     }
 
@@ -2128,6 +2137,8 @@ class DG65Anwesenheitssimulation extends IPSModule
                 ['type' => 'Label', 'caption' => 'Shorter learning phase: if a target variable is logged in the Symcon archive, its switching history is taken over for the learning window — automatically for new channels, via "📥 Fill learning memory from archive" for existing ones. Without archive logging the module simply learns by itself.'],
                 ['type' => 'Label', 'caption' => 'Long absences: while the simulation is running the learning window stands still, and the time it ran does not count towards the window afterwards — the learned days do not run out, however long you are away. Switching happens to the second, as on the reference day (plus offset).'],
                 ['type' => 'Label', 'caption' => 'Several instances are allowed (e.g. per floor or flat). Each instance learns and replays independently.'],
+                ['type' => 'Label', 'caption' => 'Questions and feedback: the module has its own thread in the Symcon forum.'],
+                ['type' => 'Button', 'caption' => 'Open forum thread', 'onClick' => "echo '" . self::FORUM_URL . "';", 'link' => true],
             ],
         ];
     }
@@ -2329,14 +2340,15 @@ class DG65Anwesenheitssimulation extends IPSModule
 
     private function ForumHint(): ?array
     {
-        if ($this->ReadAttributeBoolean('ForumHintGone')) {
+        if ($this->ReadAttributeString('ForumHintSeen') === self::FORUM_THREAD) {
             return null;
         }
         return [
             'type' => 'ExpansionPanel', 'name' => 'ForumHintPanel', 'expanded' => true,
             'caption' => '💬  Feedback',
             'items' => [
-                ['type' => 'Label', 'caption' => '🧪 The presence simulation is new — questions, wishes or bug reports are welcome (Symcon forum or GitHub).'],
+                ['type' => 'Label', 'caption' => '💬 The presence simulation has its own thread in the Symcon forum — questions, wishes and bug reports are welcome there.'],
+                ['type' => 'Button', 'caption' => 'Open forum thread', 'onClick' => "echo '" . self::FORUM_URL . "';", 'link' => true],
                 ['type' => 'Button', 'caption' => 'Open repository', 'onClick' => "echo '" . self::REPO_URL . "';", 'link' => true],
                 ['type' => 'Button', 'caption' => 'Got it – do not show again', 'onClick' => 'ANWSIM_AckForumHint($id);'],
             ],

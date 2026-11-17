@@ -3,7 +3,7 @@
 # DG65-Toolkit Presence Simulation
 
 ![Symcon](https://img.shields.io/badge/Symcon-PHPModul-blue)
-![Module Version](https://img.shields.io/badge/Module_Version-0.3.0-blue)
+![Module Version](https://img.shields.io/badge/Module_Version-0.3.1-blue)
 ![Symcon Version](https://img.shields.io/badge/Symcon_Version-9.0%2B-blue)
 ![License](https://img.shields.io/badge/License-PolyForm_Noncommercial_1.0.0-lightgrey)
 ![Check Style](https://github.com/DG65/Anwesenheitssimulation/actions/workflows/check-style.yml/badge.svg)
@@ -119,6 +119,11 @@ Failed switchings are logged permanently in the Symcon message log.
 
 The module does not require any other module and is not required by any. It offers no data contract
 for other modules — the instance functions above are plain operating entry points.
+
+## Questions and feedback
+
+The module has its own thread in the Symcon forum (in German, English posts are welcome):
+[DG65-Toolkit Bewohnersimulator](https://community.symcon.de/t/144973).
 
 ## Language
 

@@ -392,7 +392,12 @@ check('Feiertags-Auswahl: 16 Bundesländer + Österreich + Schweiz + „nicht be
 check('Kein Maschinen-Datum JJJJ-MM-TT im Formular (Regel 9b)', !preg_match('/\d{4}-\d{2}-\d{2}/', $txt));
 check('Keine Ersatz-Umlaute (ue/ae/oe) in sichtbaren Formulartexten', !preg_match('/\b(fuer|ueber|zurueck|aendern|loeschen|Rueck)/i', $txt));
 check('Kein Link-Button trägt die URL direkt in "link"', !preg_match('/"link":"http/', $txt));
+check('Panel „Rückmeldungen" und Doku verlinken den Forum-Thread 144973', substr_count($txt, 'community.symcon.de/t/144973') === 2 && str_contains($txt, 'Zum Forum-Thread') && str_contains($txt, 'eigenen Thread im Symcon-Forum'));
+// Wer den Hinweis vor 0.3.1 weggeklickt hat (als es noch keinen Thread gab), sieht ihn mit dem Link einmal wieder.
+$m->attrs['ForumHintGone'] = true;
+check('Alt-Bestand „weggeklickt": Hinweis mit dem neuen Link erscheint einmal wieder', count(array_filter(form($m)['elements'], fn($e) => ($e['name'] ?? '') === 'ForumHintPanel')) === 1);
 $m->AckPurposeIntro(); $m->AckNews(); $m->AckForumHint();
+check('Bestätigen merkt sich den Stand des Hinweises (thread-144973)', $m->attrs['ForumHintSeen'] === 'thread-144973' && count(array_filter(form($m)['elements'], fn($e) => ($e['name'] ?? '') === 'ForumHintPanel')) === 0);
 $f2 = form($m);
 check('Nach Bestätigen: Intro/News/Forum weg, Lizenz bleibt', count($f2['elements']) === count($f['elements']) - 3 && str_contains(end($f2['elements'])['caption'], 'Über dieses Modul'));
 // News-Panel nach NEWS_VERSIONS-Muster (SUITE.md Formular-Optik Punkt 1)

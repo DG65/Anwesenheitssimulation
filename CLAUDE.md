@@ -160,6 +160,11 @@
 25. **Vorschläge für Zahl-Variablen:** nur Dimmer und Rollläden (`suggestionKind()`, Profil oder
     Name). Schaltbare Zahlen sind sonst Sollwerte, Ladeströme, Betriebsarten, Türschloss-Modi —
     live nachgesehen, gut hundert solche Variablen auf Dietmars Anlage.
+26. **Forum-Thread und Store-Name:** Thread https://community.symcon.de/t/144973 (`FORUM_URL`).
+    Der Forum-Hinweis führt einen Stand (`FORUM_THREAD` in `ForumHintSeen`); ändert sich der Thread,
+    die Konstante ändern, dann erscheint der Hinweis bei allen einmal wieder. Im Store heißt das
+    Modul „DG65-Toolkit Bewohnersimulator" (30-Zeichen-Limit, Dietmar 17.11.2026) — Modulname,
+    Klasse, Präfix und Repo bleiben „Anwesenheitssimulation".
 
 ## Prüfen
 

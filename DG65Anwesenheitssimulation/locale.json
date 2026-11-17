@@ -115,7 +115,10 @@
             "ℹ️ No channels created yet.": "ℹ️ Noch keine Kanäle angelegt.",
 
             "💬  Feedback": "💬  Rückmeldungen",
-            "🧪 The presence simulation is new — questions, wishes or bug reports are welcome (Symcon forum or GitHub).": "🧪 Die Anwesenheitssimulation ist neu — Fragen, Wünsche oder Fehler sind willkommen (Symcon-Forum bzw. GitHub).",
+            "💬 The presence simulation has its own thread in the Symcon forum — questions, wishes and bug reports are welcome there.": "💬 Die Anwesenheitssimulation hat einen eigenen Thread im Symcon-Forum — Fragen, Wünsche und Fehlerberichte sind dort willkommen.",
+            "Open forum thread": "Zum Forum-Thread",
+            "Questions and feedback: the module has its own thread in the Symcon forum.": "Fragen und Rückmeldungen: Das Modul hat einen eigenen Thread im Symcon-Forum.",
+            "• 💬 The module now has its own thread in the Symcon forum — the feedback panel and the documentation link to it.": "• 💬 Das Modul hat jetzt einen eigenen Thread im Symcon-Forum — das Panel „Rückmeldungen\" und die Dokumentation verlinken ihn.",
             "Open repository": "Zum Repository",
             "🧡  About this module": "🧡  Über dieses Modul",
             "Born out of genuine enthusiasm for my own installation — and a few evenings typed through. Still: hobby or not, this is intellectual property and real work went into it.": "Entstanden aus echter Begeisterung für die eigene Anlage — und ein paar durchgetippten Abenden. Trotzdem: Software-Hobby hin oder her, das hier ist geistiges Eigentum und echte Arbeit steckt drin.",

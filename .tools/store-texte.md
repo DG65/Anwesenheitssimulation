@@ -49,6 +49,12 @@ Overview: "Show today's schedule" shows in advance what would be replayed today.
 
 While the simulation is running, nothing is learned. The module follows the language of your Symcon (English or German).
 
+## de — Versionsinformation (0.3.1)
+- Neu: Das Panel „Rückmeldungen“ und die Dokumentation verlinken den Modul-Thread im Symcon-Forum.
+
+## en — Release notes (0.3.1)
+- New: the feedback panel and the documentation link to the module thread in the Symcon forum.
+
 ## de — Versionsinformation (0.3.0)
 - Neu: Erste Veröffentlichung im Store.
 - Neu: Zweisprachig (Deutsch/Englisch).

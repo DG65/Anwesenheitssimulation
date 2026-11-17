@@ -3,7 +3,7 @@
 # DG65-Toolkit Anwesenheitssimulation
 
 ![Symcon](https://img.shields.io/badge/Symcon-PHPModul-blue)
-![Modul Version](https://img.shields.io/badge/Modul_Version-0.3.0-blue)
+![Modul Version](https://img.shields.io/badge/Modul_Version-0.3.1-blue)
 ![Symcon Version](https://img.shields.io/badge/Symcon_Version-9.0%2B-blue)
 ![License](https://img.shields.io/badge/License-PolyForm_Noncommercial_1.0.0-lightgrey)
 ![Check Style](https://github.com/DG65/Anwesenheitssimulation/actions/workflows/check-style.yml/badge.svg)
@@ -121,6 +121,12 @@ Fehlgeschlagene Schaltungen landen dauerhaft im Symcon-Meldungsprotokoll.
 
 Das Modul setzt kein anderes Modul voraus und wird von keinem vorausgesetzt. Es bietet keinen
 Daten-Vertrag für andere Module — die Instanzfunktionen oben sind reine Bedien-Einstiege.
+
+## Fragen und Rückmeldungen
+
+Das Modul hat einen eigenen Thread im Symcon-Forum:
+[DG65-Toolkit Bewohnersimulator - Anwesenheitssimulation, die aus dem echten Alltag lernt](https://community.symcon.de/t/144973).
+Fragen, Wünsche und Fehlerberichte sind dort willkommen.
 
 ## Sprache
 

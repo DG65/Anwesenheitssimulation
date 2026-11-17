@@ -3,6 +3,17 @@
 Alle nennenswerten Änderungen an diesem Modul werden hier dokumentiert.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 
+## [0.3.1] - 2026-11-18
+
+### Added
+- **Forum-Thread verlinkt:** Das Panel „💬 Rückmeldungen" und die Dokumentation führen zum
+  Modul-Thread im Symcon-Forum (https://community.symcon.de/t/144973, gepostet 18.11.2026).
+  Der Hinweis führt jetzt einen Stand (Attribut `ForumHintSeen` = `thread-144973`): Wer ihn früher
+  weggeklickt hat, als es noch keinen Thread gab, sieht ihn mit dem Link einmal wieder (Muster
+  Batteriewächter 0.11.4). Das alte Attribut `ForumHintGone` bleibt registriert.
+- README (de/en): Abschnitt „Fragen und Rückmeldungen" mit dem Thread, dazu der Store-Name
+  „DG65-Toolkit Bewohnersimulator" (der Store erlaubt höchstens 30 Zeichen).
+
 ## [0.3.0] - 2026-11-17
 
 ### Added

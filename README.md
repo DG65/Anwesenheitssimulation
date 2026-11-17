@@ -15,6 +15,9 @@ aus jedem Modul** — und spielt dieses echte Muster ab, sobald niemand da ist. 
 Lichtschein eines bewohnten Hauses und den Anschein, der damit einhergeht: der Schein trügt.
 (Bis Version 0.1.3 hieß das Modul deshalb „Schein".)
 
+Im Symcon-Store steht das Modul unter dem Namen **„DG65-Toolkit Bewohnersimulator"** (Store-Namen
+dürfen höchstens 30 Zeichen haben). In Symcon selbst heißt die Instanz „Anwesenheitssimulation".
+
 Symcon bietet im Store ein eigenes Modul „Anwesenheits-Simulation", das aus archivierten
 (geloggten) Schaltvorgängen abspielt. Dieses Modul geht einen eigenen Weg: Es lernt selbst und
 braucht kein Archiv (nutzt es aber, wenn vorhanden, um sofort loszulegen), verschiebt die

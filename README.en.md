@@ -15,6 +15,10 @@ variable, from any module** — and replays that real pattern as soon as nobody 
 the glow of an occupied house and the impression that goes with it. (Up to version 0.1.3 the module
 was therefore called "Schein", German for both "glow" and "appearance".)
 
+In the Symcon store the module is listed as **"DG65-Toolkit Resident Sim."** (German:
+"DG65-Toolkit Bewohnersimulator"; store names are limited to 30 characters). In Symcon itself the
+instance is called "Anwesenheitssimulation".
+
 Symcon offers its own module "Anwesenheits-Simulation" in the store, which replays archived
 (logged) switching events. This module takes its own approach: it learns by itself and needs no
 archive (but uses one, if present, to get going right away), shifts the switching times randomly

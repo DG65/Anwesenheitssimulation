@@ -1,15 +1,24 @@
-# Store-Texte (Anwesenheitssimulation, vorgesehen: eu.dg.anwesenheitssimulation)
+# Store-Texte (Bundle eu.dg.anwesenheitssimulation)
 
-Stand 17.11.2026 — Entwurf für die erste Einreichung (Kanal Beta). Noch nichts eingereicht.
+Stand 17.11.2026 — Beta eingereicht und sofort veröffentlicht: Release 21508, Commit cb8f0c6
+(0.3.0 Build 8), Kategorien Sicherheit (2) und Komfort (3), `close_lower_channels` = 0.
+Stable: noch keine (erste Stable nur auf Dietmars Wunsch).
+
+**Store-Name weicht vom Modulnamen ab.** Der Store erlaubt höchstens 30 Zeichen;
+„DG65-Toolkit Anwesenheitssimulation" hat 35. Dietmar hat am 17.11.2026 „DG65-Toolkit
+Bewohnersimulator" gewählt (30 Zeichen). Im Modul, im Formular und auf GitHub bleibt es bei
+„Anwesenheitssimulation"; die Beschreibung nennt deshalb im ersten Absatz beide Namen. Die
+Store-Suche durchsucht Name, Beschreibung und `library.json` — „Anwesenheitssimulation" findet
+das Modul (geprüft am 17.11.2026).
 
 ## de — Name
-DG65-Toolkit Anwesenheitssimulation
+DG65-Toolkit Bewohnersimulator
 
 ## en — Name
-DG65-Toolkit Presence Simulation
+DG65-Toolkit Resident Sim.
 
 ## de — Beschreibung
-Die Anwesenheitssimulation lässt ein leeres Haus bewohnt aussehen. Sie merkt sich, wann im Alltag wirklich Licht, Rollläden, Steckdosen oder das Radio geschaltet werden, und spielt dieses echte Muster ab, sobald niemand da ist. Das geht mit jeder schaltbaren Variable aus jedem Modul.
+Der Bewohnersimulator ist eine Anwesenheitssimulation aus dem DG65-Toolkit: Er lässt ein leeres Haus bewohnt aussehen. Er merkt sich, wann im Alltag wirklich Licht, Rollläden, Steckdosen oder das Radio geschaltet werden, und spielt dieses echte Muster ab, sobald niemand da ist. Das geht mit jeder schaltbaren Variable aus jedem Modul. In Symcon heißt die Instanz „DG65-Toolkit Anwesenheitssimulation“.
 
 Lernen: Jede echte Wertänderung der gewählten Variablen wird mit Zeitpunkt gemerkt. Ein Archiv ist dafür nicht nötig. Wird eine Variable aber im Archiv geloggt, übernimmt das Modul ihren bisherigen Schaltverlauf und ist sofort einsatzbereit. Das Lernfenster (Standard 28 Tage) rollt mit, so folgt das Muster der Jahreszeit.
 Abspielen: Für jeden Tag wählt das Modul einen echten Vorbild-Tag desselben Wochentags und spielt dessen Schaltfolge sekundengenau ab, verschoben um einen zufälligen Versatz. Auch bei langer Abwesenheit gehen die gelernten Tage nicht aus. Alle Kanäle nehmen auf Wunsch denselben Vorbild-Tag, die Reihenfolge zwischen den Räumen bleibt echt.
@@ -25,7 +34,7 @@ Meldungen: Auf Wunsch kommt eine Push-Nachricht, wenn eine Schaltung fehlschläg
 Während die Simulation läuft, wird nicht gelernt. Das Modul folgt der Sprache deines Symcon (Deutsch oder Englisch).
 
 ## en — Description
-The presence simulation makes an empty house look lived-in. It remembers when lights, shutters, sockets or the radio are really switched in everyday life and replays that real pattern as soon as nobody is home. This works with any switchable variable from any module.
+The Resident Simulator is a presence simulation from the DG65-Toolkit: it makes an empty house look lived-in. It remembers when lights, shutters, sockets or the radio are really switched in everyday life and replays that real pattern as soon as nobody is home. This works with any switchable variable from any module. In Symcon the instance is called "DG65-Toolkit Anwesenheitssimulation".
 
 Learning: every real value change of the chosen variables is remembered with its time. No archive is needed. But if a variable is logged in the archive, the module takes over its switching history and is ready to use right away. The learning window (default 28 days) rolls along, so the pattern follows the season.
 Replaying: for each day the module picks a real reference day of the same weekday and replays its switching sequence to the second, shifted by a random offset. Even during long absences the learned days do not run out. If desired, all channels use the same reference day, so the order between the rooms stays real.
@@ -84,6 +93,6 @@ en: https://github.com/DG65/Anwesenheitssimulation/blob/beta/README.md
   Minutentakt, keine Mindestzahl je Vorbild-Tag); dazu kamen der Archiv-Import und sechs
   Ergänzungen (Vorschläge, Auslöser mit Hausmodus und Verzögerung, Endaktion, Übersicht für die
   Visualisierung, Feiertage, Sperrliste für Wärme- und Kühlgeräte).
-- Erste Einreichung nur Kanal Beta; Stable erst auf Dietmars Wunsch (Release-Regel).
-- Kategorien bei der Einreichung wählen.
+- Erste Einreichung nur Kanal Beta (erledigt 17.11.2026); Stable erst auf Dietmars Wunsch (Release-Regel).
+- Vor jeder Einreichung `publish_set_release_flags(closeLowerChannels=false)` setzen.
 - `library.json`: `date` auf die Unixzeit des Release setzen, `build` = Zahl der Commits an `library.json`.

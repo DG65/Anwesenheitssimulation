@@ -49,6 +49,14 @@ Overview: "Show today's schedule" shows in advance what would be replayed today.
 
 While the simulation is running, nothing is learned. The module follows the language of your Symcon (English or German).
 
+## de — Versionsinformation (0.3.2)
+- Fix: Die Beschriftung der Werteliste beim Auslöser wird nicht mehr abgeschnitten.
+- Fix: „Heutiger Ablauf“ sagt jetzt, wenn ein Kanal heute gar nicht geschaltet wird.
+
+## en — Release notes (0.3.2)
+- Fix: the caption of the trigger value list is no longer cut off.
+- Fix: "Today's schedule" now says when a channel is not switched at all today.
+
 ## de — Versionsinformation (0.3.1)
 - Neu: Das Panel „Rückmeldungen“ und die Dokumentation verlinken den Modul-Thread im Symcon-Forum.
 

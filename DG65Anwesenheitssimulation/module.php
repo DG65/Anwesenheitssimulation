@@ -94,6 +94,10 @@ class DG65Anwesenheitssimulation extends IPSModule
         '0.3.1' => [
             '• 💬 The module now has its own thread in the Symcon forum — the feedback panel and the documentation link to it.',
         ],
+        '0.3.2' => [
+            '• Form: the caption of the trigger value list is no longer cut off.',
+            '• "Today\'s schedule": a channel without any switching on its reference day now says so instead of showing only dashes.',
+        ],
     ];
     private const REPO_URL     = 'https://github.com/DG65/Anwesenheitssimulation';
     // Modul-Thread im Symcon-Forum. FORUM_THREAD ist der Stand des Hinweises: Wer den Hinweis früher
@@ -1811,6 +1815,9 @@ class DG65Anwesenheitssimulation extends IPSModule
                             break;
                         }
                     }
+                    if ($cols[2] === '–' && $cols[4] === '–') {
+                        $cols[4] = $this->t('no switching today'); // Vorbild-Tag ohne Schaltung dieses Kanals
+                    }
                 } else {
                     $cols[1] = $this->t('nothing learned yet');
                 }
@@ -2209,7 +2216,7 @@ class DG65Anwesenheitssimulation extends IPSModule
                 ['type' => 'Label', 'caption' => 'The switch "Simulation active" below the instance does the same — also from WebFront/tile, by event or script.'],
                 ['type' => 'ExpansionPanel', 'expanded' => false, 'caption' => '▶️  Start and end', 'items' => [
                     ['type' => 'SelectVariable', 'name' => 'TriggerID', 'caption' => 'Trigger variable (optional)'],
-                    ['type' => 'ValidationTextBox', 'name' => 'TriggerValues', 'caption' => 'Values that mean "simulate" (number/text variables, comma-separated, e.g. 3,4)'],
+                    ['type' => 'ValidationTextBox', 'name' => 'TriggerValues', 'caption' => 'Values that mean "simulate" (number/text variables, comma-separated, e.g. 3,4)', 'width' => '100%'], // volle Breite, sonst wird die Beschriftung abgeschnitten (Bildschirmfoto Dietmar 18.11.2026)
                     ['type' => 'CheckBox', 'name' => 'TriggerInvert', 'caption' => 'Invert trigger (simulate while the condition is NOT met, e.g. a variable "Present")'],
                     ['type' => 'NumberSpinner', 'name' => 'TriggerDelay', 'caption' => 'Start delay', 'suffix' => ' min', 'minimum' => 0, 'maximum' => 720],
                     ['type' => 'Label', 'name' => 'TriggerStatus', 'caption' => $this->triggerStatusText()],

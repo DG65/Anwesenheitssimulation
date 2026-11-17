@@ -255,6 +255,9 @@
             "Visualization": "Visualisierung",
             "🔔 Send test notification": "🔔 Probemeldung senden",
             "ℹ️ While nobody is home, nobody notices that a lamp no longer responds — the notification tells you. Notifications are sent as push to the tile visualization or the WebFront; apply changes before testing. Failed switchings are always written to the message log as well.": "ℹ️ Wenn niemand da ist, bemerkt auch niemand, dass eine Lampe nicht mehr reagiert — die Meldung sagt es dir. Gesendet wird als Push an die Kachel-Visualisierung oder das WebFront; Änderungen vor dem Test übernehmen. Fehlgeschlagene Schaltungen stehen außerdem immer im Meldungsprotokoll.",
+            "no switching today": "heute keine Schaltung",
+            "• Form: the caption of the trigger value list is no longer cut off.": "• Formular: Die Beschriftung der Werteliste beim Auslöser wird nicht mehr abgeschnitten.",
+            "• \"Today's schedule\": a channel without any switching on its reference day now says so instead of showing only dashes.": "• „Heutiger Ablauf\": Ein Kanal, der an seinem Vorbild-Tag gar nicht geschaltet wurde, sagt das jetzt, statt nur Striche zu zeigen.",
             "Active — channels configured, the module is learning or replaying": "Aktiv — Kanäle konfiguriert, das Modul lernt bzw. spielt ab",
             "Inactive — no channel with a valid target variable configured yet": "Inaktiv — noch kein Kanal mit gültiger Zielvariable konfiguriert"
         }

@@ -3,6 +3,15 @@
 Alle nennenswerten Änderungen an diesem Modul werden hier dokumentiert.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 
+## [0.3.2] - 2026-11-18
+
+### Fixed
+- Formular, Untergruppe „Start und Ende": Die Beschriftung des Felds „Werte, die ‚simulieren'
+  bedeuten …" wurde abgeschnitten (Dietmars Bildschirmfoto vom 18.11.2026). Das Feld nutzt jetzt
+  die volle Breite.
+- Variable „Heutiger Ablauf": Ein Kanal, der an seinem Vorbild-Tag gar nicht geschaltet wurde,
+  zeigte nur Striche. Jetzt steht dort „heute keine Schaltung".
+
 ## [0.3.1] - 2026-11-18
 
 ### Added

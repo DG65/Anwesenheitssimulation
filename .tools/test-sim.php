@@ -809,6 +809,14 @@ check('Kanalname wird HTML-sicher ausgegeben (kein fremdes Markup in der Visuali
 clock('2026-08-10 19:00:05'); $m11->Tick(); $h2 = $sched();
 check('Nach der Schaltung: aktueller Stand „An" seit 19:00, nächster „Aus" um 22:00', preg_match('~<td[^>]*>An</td><td[^>]*>19:00</td><td[^>]*>Aus</td><td[^>]*>22:00</td></tr>~', $h2) === 1, $h2);
 $m11->SetActive(false);
+// Vorbild-Tag, an dem ein zweiter Kanal gar nicht geschaltet wurde: Hinweis statt nur Striche (0.3.2).
+mkvar(441, VARIABLETYPE_BOOLEAN, false, 'Kellerlampe', '', 1, true);
+clock('2026-08-11 12:00:00');
+$m11->props['Channels'] = json_encode([['Caption' => 'Lese', 'TargetID' => 440, 'Mode' => 1, 'TimeRef' => 0, 'JitterMin' => 0], ['Caption' => 'Keller', 'TargetID' => 441, 'Mode' => 1, 'TimeRef' => 0, 'JitterMin' => 0]]); $m11->ApplyChanges();
+clock('2026-08-02 09:00:00'); fire($m11, 441, true); clock('2026-08-02 09:30:00'); fire($m11, 441, false); // Keller nur am So 02.08. geschaltet
+clock('2026-08-17 12:00:00'); $m11->SetActive(true); // Montag: gemeinsames Vorbild Mo 03.08. — an dem Tag hat der Keller nicht geschaltet
+check('Kanal ohne Schaltung am Vorbild-Tag: „heute keine Schaltung" statt nur Striche', (bool)preg_match('~Keller</td><td[^>]*>Mo 03\.08\.2026</td><td[^>]*>–</td><td[^>]*>–</td><td[^>]*>heute keine Schaltung</td>~', $sched()), $sched());
+$m11->SetActive(false);
 check('Nach dem Beenden wieder der Lern-Hinweis', str_contains($sched(), 'Simulation ist aus') && !str_contains($sched(), '<table'));
 
 heading('25. Vorschläge: passende Variablen aus dem Archiv (0.3.0)');

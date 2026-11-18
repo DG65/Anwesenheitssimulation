@@ -291,6 +291,7 @@
             "ℹ️ The archive has no values of the sensor around sunrise and sunset in the last 14 days.": "ℹ️ Das Archiv hat für die letzten 14 Tage keine Werte des Sensors rund um Sonnenauf- und -untergang.",
             "✅ Suggested from the last 14 days: evening %1$s, morning %2$s (the usual value half an hour before sunset and after sunrise). Not saved yet: adjust if you like and confirm with \"Apply\".": "✅ Vorschlag aus den letzten 14 Tagen: abends %1$s, morgens %2$s (der übliche Wert eine halbe Stunde vor Sonnenuntergang bzw. nach Sonnenaufgang). Noch nicht gespeichert: bei Bedarf anpassen und mit „Übernehmen\" bestätigen.",
             "• New time reference \"Outside brightness\": a brightness or irradiance sensor (e.g. a weather station) decides when it is dusk and dawn — under dark clouds the lights come on earlier.": "• Neuer Zeitbezug „Außenhelligkeit\": Ein Helligkeits- oder Einstrahlungssensor (z. B. einer Wetterstation) bestimmt, wann es dämmert — unter dunklen Wolken geht das Licht früher an.",
+            "• \"Suggest thresholds\" now proposes round numbers (e.g. 400 instead of 398.7).": "• „Schwellen vorschlagen\" schlägt jetzt glatte Zahlen vor (z. B. 400 statt 398,7).",
             "Active — channels configured, the module is learning or replaying": "Aktiv — Kanäle konfiguriert, das Modul lernt bzw. spielt ab",
             "Inactive — no channel with a valid target variable configured yet": "Inaktiv — noch kein Kanal mit gültiger Zielvariable konfiguriert"
         }

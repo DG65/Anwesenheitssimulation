@@ -49,6 +49,12 @@ Overview: "Show today's schedule" shows in advance what would be replayed today.
 
 While the simulation is running, nothing is learned. The module follows the language of your Symcon (English or German).
 
+## de — Versionsinformation (0.3.4)
+- Neu: „Schwellen vorschlagen“ schlägt glatte Zahlen vor.
+
+## en — Release notes (0.3.4)
+- New: "Suggest thresholds" proposes round numbers.
+
 ## de — Versionsinformation (0.3.3)
 - Neu: Zeitbezug „Sonnenauf- und -untergang“ (morgens gilt der Aufgang, abends der Untergang).
 - Neu: Zeitbezug „Außenhelligkeit“: Ein Helligkeits- oder Einstrahlungssensor, z. B. von einer Wetterstation, bestimmt die Dämmerung. Unter dunklen Wolken geht das Licht früher an.

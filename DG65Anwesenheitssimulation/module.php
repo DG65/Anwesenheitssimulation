@@ -104,6 +104,9 @@ class DG65Anwesenheitssimulation extends IPSModule
             '• Form: short field captions, the explanation now stands below each field.',
             '• New time reference "Outside brightness": a brightness or irradiance sensor (e.g. a weather station) decides when it is dusk and dawn — under dark clouds the lights come on earlier.',
         ],
+        '0.3.4' => [
+            '• "Suggest thresholds" now proposes round numbers (e.g. 400 instead of 398.7).',
+        ],
     ];
     private const REPO_URL     = 'https://github.com/DG65/Anwesenheitssimulation';
     // Modul-Thread im Symcon-Forum. FORUM_THREAD ist der Stand des Hinweises: Wer den Hinweis früher
@@ -649,7 +652,10 @@ class DG65Anwesenheitssimulation extends IPSModule
                 return 0.0;
             }
             sort($list);
-            return round((float)$list[intdiv(count($list), 2)], 1);
+            // Glatte Zahl vorschlagen (zwei gültige Stellen): 398,7 → 400, 1225 → 1200. Ein Vorschlag auf
+            // die Nachkommastelle täuscht eine Genauigkeit vor, die es nicht gibt (Hinweis aus dem Forum).
+            $value = (float)$list[intdiv(count($list), 2)];
+            return $value < 10 ? round($value, 1) : round($value, 1 - (int)floor(log10($value)));
         };
         $dawn = $median($values[0]);
         $dusk = $median($values[1]);

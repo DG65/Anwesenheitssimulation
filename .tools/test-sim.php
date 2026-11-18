@@ -1047,6 +1047,10 @@ for ($d = 1; $d <= 14; $d++) { [$srD, $ssD] = $sunOf(date('Y-m-d', strtotime('20
 $m17->fieldUpdates = []; $rS = $m17->SuggestBrightness(810);
 $fu = []; foreach ($m17->fieldUpdates as $u) { $fu[$u[0]] = $u[2]; }
 check('Schwellen-Vorschlag: Median der letzten 14 Tage, ins Formular eingetragen, nicht gespeichert', ($fu['BrightnessDusk'] ?? null) === 78.0 && ($fu['BrightnessDawn'] ?? null) === 48.0 && str_contains($rS, 'abends 78') && $m17->props['BrightnessDusk'] === 50.0, $rS . ' ' . json_encode($fu));
+$GLOBALS['ARCHIVE'][810] = [];
+for ($d = 1; $d <= 14; $d++) { [$srD, $ssD] = $sunOf(date('Y-m-d', strtotime('2026-12-20 -' . $d . ' days'))); $GLOBALS['ARCHIVE'][810][] = [$ssD - 2000, 398.7]; $GLOBALS['ARCHIVE'][810][] = [$srD + 1500, $d === 8 ? 1225.4 : ($d < 8 ? 3.44 : 9000.0)]; }
+$m17->fieldUpdates = []; $m17->SuggestBrightness(810); $fu = []; foreach ($m17->fieldUpdates as $u) { $fu[$u[0]] = $u[2]; }
+check('Vorschlag als glatte Zahl: 398,7 → 400 und 1225,4 → 1200 (keine vorgetäuschte Genauigkeit)', ($fu['BrightnessDusk'] ?? null) === 400.0 && ($fu['BrightnessDawn'] ?? null) === 1200.0, json_encode($fu));
 check('Sensor ohne Archiv: klare Auskunft, was man von Hand einträgt', str_contains($m17->SuggestBrightness(812), 'nicht im Archiv geloggt') && str_contains($m17->SuggestBrightness(0), 'zuerst einen Helligkeitssensor'));
 // Ohne Sensor verhält sich „Außenhelligkeit" wie „Sonnenauf- und -untergang".
 $m17->props['BrightnessID'] = 0; $m17->ApplyChanges(); $setSun('2026-12-21'); clock('2026-12-21 03:00:00'); $pB = $m17->Preview();

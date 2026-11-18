@@ -3,6 +3,14 @@
 Alle nennenswerten Änderungen an diesem Modul werden hier dokumentiert.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 
+## [0.3.4] - 2026-11-18
+
+### Changed
+- „Schwellen vorschlagen" rundet auf zwei gültige Stellen (398,7 → 400; 1225 → 1200; unter 10 eine
+  Nachkommastelle). Anlass: Roberto im Forum (Beitrag 6, MDT-KNX-Wetterstation: 398,7 und 622,7 Lux,
+  „der Vorschlag nimmt es sehr genau"). Die Größenordnung fand er realistisch (er schaltet seine
+  Außenbeleuchtung bei 450 Lux).
+
 ## [0.3.3] - 2026-11-18
 
 ### Added

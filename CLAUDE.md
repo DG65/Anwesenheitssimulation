@@ -160,6 +160,19 @@
 25. **Vorschläge für Zahl-Variablen:** nur Dimmer und Rollläden (`suggestionKind()`, Profil oder
     Name). Schaltbare Zahlen sind sonst Sollwerte, Ladeströme, Betriebsarten, Türschloss-Modi —
     live nachgesehen, gut hundert solche Variablen auf Dietmars Anlage.
+27. **Wiedergabe-Fortschritt = Zähler (`done`), nicht Uhrzeit (seit 0.3.3):** `scheduledEvents()` gibt
+    jeder Schaltung des Vorbild-Tags einen festen Index `i`; `Tick()` spielt die letzte fällige mit
+    `i >= done` und setzt `done` dahinter. Jede Schaltung muss den ganzen Tag über dieselbe Zeit
+    haben, außer die gemessene Dämmerung ändert sich — deshalb wird der Sonnenstand über den
+    Tagesabstand des Vorbilds zugeordnet (`$astroToday`), nie über „am nächsten zu jetzt".
+28. **Außenhelligkeit (`TIMEREF_BRIGHT`):** `trackBrightness()` läuft immer mit (10-Minuten-Regel,
+    Fenster um den Sonnenstand), Speicher `Twilight` (Variable, überlebt Resync), Vorbild-Tage über
+    `twilightOf()` einmalig aus dem Archiv. `brightAnchorsToday()` = gemessen, sonst üblich, sonst
+    Fensterende; je Tageshälfte fällt der Kanal einzeln auf den Sonnenstand zurück. Schwellen 0 =
+    aus. Live gesehen (Dietmar): Wetterstation „Solar Einstrahlung" #14769 (lx) und #42377 (W/m²),
+    daneben 15 Innenraum-Melder mit Profil Illumination — die Suche muss draußen bevorzugen.
+29. **Beschriftungen ≤ 40 Zeichen, Erklärung als `<Feld>Hint` direkt dahinter** (SUITE.md); Prüfstand
+    Block 31 misst DE und EN am fertigen Formular.
 26. **Forum-Thread und Store-Name:** Thread https://community.symcon.de/t/144973 (`FORUM_URL`).
     Der Forum-Hinweis führt einen Stand (`FORUM_THREAD` in `ForumHintSeen`); ändert sich der Thread,
     die Konstante ändern, dann erscheint der Hinweis bei allen einmal wieder. Im Store heißt das

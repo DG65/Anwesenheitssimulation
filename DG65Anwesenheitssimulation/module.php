@@ -98,6 +98,12 @@ class DG65Anwesenheitssimulation extends IPSModule
             '• Form: the caption of the trigger value list is no longer cut off.',
             '• "Today\'s schedule": a channel without any switching on its reference day now says so instead of showing only dashes.',
         ],
+        '0.3.3' => [
+            '• New time reference "Sunrise and sunset": morning switchings follow sunrise, evening switchings follow sunset.',
+            '• The channel list grows with the number of channels.',
+            '• Form: short field captions, the explanation now stands below each field.',
+            '• New time reference "Outside brightness": a brightness or irradiance sensor (e.g. a weather station) decides when it is dusk and dawn — under dark clouds the lights come on earlier.',
+        ],
     ];
     private const REPO_URL     = 'https://github.com/DG65/Anwesenheitssimulation';
     // Modul-Thread im Symcon-Forum. FORUM_THREAD ist der Stand des Hinweises: Wer den Hinweis früher
@@ -150,6 +156,17 @@ class DG65Anwesenheitssimulation extends IPSModule
     private const TIMEREF_CLOCK   = 0;
     private const TIMEREF_SUNSET  = 1;
     private const TIMEREF_SUNRISE = 2;
+    private const TIMEREF_SUN     = 3; // beides: je Schaltung der nähere Sonnenstand (morgens Aufgang, abends Untergang)
+    private const TIMEREF_BRIGHT  = 4; // wie TIMEREF_SUN, aber mit GEMESSENER Dämmerung (Helligkeitssensor) statt Sonnenstand
+
+    // Gemessene Dämmerung: Sie gilt, wenn der Sensor so lange unter (abends) bzw. über (morgens) der
+    // Schwelle bleibt. Gesucht wird nur in einem Fenster um den Sonnenstand — ein Gewitter am Mittag
+    // ist keine Abenddämmerung.
+    private const TWILIGHT_SUSTAIN = 600;
+    private const DUSK_BEFORE = 7200;
+    private const DUSK_AFTER  = 5400;
+    private const DAWN_BEFORE = 5400;
+    private const DAWN_AFTER  = 7200;
 
     // Sprach-Tabelle (siehe t()): null = noch nicht ermittelt, [] = Englisch
     // (Quelltext bleibt), Array = deutsche Tabelle aus locale.json,
@@ -178,6 +195,10 @@ class DG65Anwesenheitssimulation extends IPSModule
         $this->RegisterPropertyBoolean('NotifyFailure', false);
         $this->RegisterPropertyBoolean('NotifyStartStop', false);
         $this->RegisterPropertyString('NotifyTargets', '[]');
+        // Außenhelligkeit: Sensor und Schwellen für die gemessene Dämmerung (0 = nicht genutzt).
+        $this->RegisterPropertyInteger('BrightnessID', 0);
+        $this->RegisterPropertyFloat('BrightnessDusk', 0);
+        $this->RegisterPropertyFloat('BrightnessDawn', 0);
 
         // Tagesplan der laufenden Simulation (Vorbild-Tag, Jitter, bis
         // wohin schon abgespielt wurde). Bewusst ein Attribut: geht bei
@@ -197,6 +218,8 @@ class DG65Anwesenheitssimulation extends IPSModule
         $this->RegisterAttributeString('EndState', '{}');
         // Je Kanal der Tag der letzten Fehlschlag-Meldung (höchstens eine Meldung je Kanal und Tag).
         $this->RegisterAttributeString('FailNotified', '{}');
+        // Seit wann der Helligkeitssensor heute unter/über der Schwelle liegt (für die 10-Minuten-Regel).
+        $this->RegisterAttributeString('BrightTrack', '{}');
 
         // Dismiss-Zustände der Rahmen-Panels.
         $this->RegisterAttributeBoolean('PurposeIntroGone', false);
@@ -240,6 +263,14 @@ class DG65Anwesenheitssimulation extends IPSModule
         // nach langer Abwesenheit leer (siehe windowStart()).
         $periodsNew = !$this->periodsID();
         $this->MaintainVariable('SimPeriods', $this->t('Simulation periods (internal)'), VARIABLETYPE_STRING, '', 99, true);
+        // Gemessene Dämmerung je Tag (JSON {"JJJJ-MM-TT": [morgens, abends]}). Variable statt Attribut,
+        // damit die Vorbild-Tage ihre Dämmerung auch nach einem Modul-Resync behalten.
+        $twilightNew = !$this->twilightID();
+        $this->MaintainVariable('Twilight', $this->t('Measured twilight (internal)'), VARIABLETYPE_STRING, '', 98, true);
+        if ($twilightNew && ($twid = $this->twilightID())) {
+            $this->SetValue('Twilight', '{}');
+            IPS_SetHidden($twid, true); // nur bei der Neuanlage voreinstellen
+        }
         if ($periodsNew && ($pid = $this->periodsID())) {
             SetValueString($pid, '[]');
             IPS_SetHidden($pid, true); // nur bei der Neuanlage voreinstellen
@@ -312,6 +343,11 @@ class DG65Anwesenheitssimulation extends IPSModule
         if ($trigger > 0 && IPS_VariableExists($trigger)) {
             $this->RegisterMessage($trigger, VM_UPDATE);
         }
+        $brightness = $this->brightnessID();
+        if ($brightness > 0) {
+            $this->RegisterMessage($brightness, VM_UPDATE);
+        }
+        $this->twMemo = [];
         // Geänderte Einstellungen: eine laufende Startverzögerung verfällt.
         $this->SetTimerInterval('StartDelay', 0);
         $this->WriteAttributeInteger('DelayUntil', 0);
@@ -337,6 +373,12 @@ class DG65Anwesenheitssimulation extends IPSModule
         }
         if ($Message !== VM_UPDATE) {
             return;
+        }
+        if ($SenderID > 0 && $SenderID === $this->ReadPropertyInteger('BrightnessID')) {
+            $this->trackBrightness((float)($Data[0] ?? 0), false);
+            if ($SenderID !== $this->ReadPropertyInteger('TriggerID') && $this->channelByTarget((int)$SenderID) === null) {
+                return;
+            }
         }
         if ($SenderID === $this->ReadPropertyInteger('TriggerID') && $SenderID > 0) {
             // Auslöser-Variable: Beenden wirkt sofort, der Start auf Wunsch verzögert (kurzer Einkauf).
@@ -524,6 +566,98 @@ class DG65Anwesenheitssimulation extends IPSModule
         return $this->t('📥 Archive import:') . "\n" . implode("\n", $lines);
     }
 
+    /**
+     * ANWSIM_FindBrightness($id): string — sucht einen Helligkeits- oder Einstrahlungssensor (z. B. den einer
+     * Wetterstation) und trägt den besten Treffer ins Formular ein. Gespeichert wird erst mit "Übernehmen".
+     */
+    public function FindBrightness(): string
+    {
+        $archive = IPS_GetInstanceListByModuleID(self::ARCHIVE_GUID)[0] ?? 0;
+        $found = [];
+        foreach (IPS_GetVariableList() as $vid) {
+            $var = IPS_GetVariable($vid);
+            $type = (int)$var['VariableType'];
+            if (($type !== VARIABLETYPE_INTEGER && $type !== VARIABLETYPE_FLOAT) || IPS_GetParent($vid) === $this->InstanceID) {
+                continue;
+            }
+            $text = mb_strtolower(IPS_GetLocation($vid) . ' ' . implode(' ', $this->profileNames($vid)));
+            if (!preg_match('/helligkeit|illumination|brightness|einstrahlung|strahlung|irradiance|radiation|\blux\b|w\/m/u', $text)) {
+                continue;
+            }
+            if (preg_match('/\bled\b|led-|intensity|dimm/u', $text) || (int)($var['VariableUpdated'] ?? 1) <= 0) {
+                continue; // LED-Helligkeit einer Wallbox, Dimmer, nie aktualisierte Variablen
+            }
+            $score = 0;
+            if (preg_match('/wetter|weather|aussen|außen|outdoor|outside|garten|garden|solar|strahlung|irradiance|radiation/u', $text)) {
+                $score += 4; // draußen
+            }
+            if ($archive && AC_GetLoggingStatus($archive, $vid)) {
+                $score += 2; // mit Archiv kennen auch die Vorbild-Tage ihre Dämmerung
+            }
+            if (preg_match('/mittelwert|average|\bmw\b|umrechn/u', $text)) {
+                $score -= 1; // abgeleiteter Wert, das Original ist besser
+            }
+            if (preg_match('/sensor multilevel|bewegung|motion|präsenz|presence/u', $text)) {
+                $score -= 2; // Melder im Innenraum
+            }
+            $found[] = [$score, (float)GetValue($vid), (int)$vid];
+        }
+        if (count($found) === 0) {
+            return $this->t('ℹ️ No brightness or irradiance sensor found. You can choose any number variable by hand.');
+        }
+        rsort($found);
+        $lines = [];
+        foreach (array_slice($found, 0, 5) as $row) {
+            $lines[] = '• ' . IPS_GetLocation($row[2]) . ' = ' . GetValueFormatted($row[2]);
+        }
+        $this->UpdateFormField('BrightnessID', 'value', $found[0][2]);
+        return $this->t('✅ %1$s sensor(s) found, the first one is entered — not saved yet: confirm with "Apply". Then use "Suggest thresholds".', count($found)) . "\n" . implode("\n", $lines);
+    }
+
+    /**
+     * ANWSIM_SuggestBrightness($id, $sensorID): string — schlägt die beiden Schwellen aus dem Archiv des Sensors
+     * vor: der übliche Wert eine halbe Stunde vor Sonnenuntergang bzw. nach Sonnenaufgang (Median, 14 Tage).
+     */
+    public function SuggestBrightness(int $sensorID): string
+    {
+        $archive = IPS_GetInstanceListByModuleID(self::ARCHIVE_GUID)[0] ?? 0;
+        if ($sensorID <= 0 || !IPS_VariableExists($sensorID)) {
+            return $this->t('ℹ️ Choose a brightness sensor first.');
+        }
+        if (!$archive || !AC_GetLoggingStatus($archive, $sensorID)) {
+            return $this->t('ℹ️ The sensor is not logged in the archive — thresholds cannot be suggested. Enter them by hand: the value at which you would switch the light on in the evening and off in the morning.');
+        }
+        $now = $this->now();
+        $values = [[], []];
+        for ($d = 1; $d <= 14; $d++) {
+            $sun = $this->sunOfDay((int)strtotime('-' . $d . ' days', $now));
+            if ($sun === null) {
+                return $this->t('ℹ️ No location found (Symcon Location Control) — the sun position is needed for the suggestion.');
+            }
+            foreach ([0 => $sun[0] + 1800, 1 => $sun[1] - 1800] as $slot => $at) {
+                $rows = AC_GetLoggedValues($archive, $sensorID, $at - 3600, $at, 1);
+                if (isset($rows[0]['Value'])) {
+                    $values[$slot][] = (float)$rows[0]['Value'];
+                }
+            }
+        }
+        if (count($values[0]) === 0 && count($values[1]) === 0) {
+            return $this->t('ℹ️ The archive has no values of the sensor around sunrise and sunset in the last 14 days.');
+        }
+        $median = function (array $list): float {
+            if (count($list) === 0) {
+                return 0.0;
+            }
+            sort($list);
+            return round((float)$list[intdiv(count($list), 2)], 1);
+        };
+        $dawn = $median($values[0]);
+        $dusk = $median($values[1]);
+        $this->UpdateFormField('BrightnessDawn', 'value', $dawn);
+        $this->UpdateFormField('BrightnessDusk', 'value', $dusk);
+        return $this->t('✅ Suggested from the last 14 days: evening %1$s, morning %2$s (the usual value half an hour before sunset and after sunrise). Not saved yet: adjust if you like and confirm with "Apply".', $dusk, $dawn);
+    }
+
     /** ANWSIM_TestNotification($id): string — schickt eine Probemeldung an die gewählten Visualisierungen. */
     public function TestNotification(): string
     {
@@ -700,6 +834,11 @@ class DG65Anwesenheitssimulation extends IPSModule
             $plan = $this->buildPlan($now);
             $this->settle($plan, $now);
         }
+        // Gemessene Dämmerung nachführen — auch wenn der Sensor bei gleichem Wert nichts meldet.
+        $brightness = $this->brightnessID();
+        if ($brightness > 0) {
+            $this->trackBrightness((float)GetValue($brightness), true);
+        }
 
         $nextAt = null;
         $nextText = '';
@@ -709,20 +848,37 @@ class DG65Anwesenheitssimulation extends IPSModule
                 continue;
             }
             $p = &$plan['channels'][$tid];
-            $playedUpTo = (int)($p['playedUpTo'] ?? 0);
+            $events = $this->scheduledEvents($ch, $p, $now);
+            // Der Fortschritt je Kanal ist die ZAHL der erledigten Schaltungen des Vorbild-Tags ("done"),
+            // nicht eine Uhrzeit: Beim Zeitbezug "Außenhelligkeit" verschieben sich die Zeiten im Lauf des
+            // Tages (die Dämmerung kommt früher oder später als üblich). So wird eine vorgerückte
+            // Schaltung nachgeholt und eine nach hinten gerückte nicht doppelt abgespielt.
+            if (!isset($p['done'])) {
+                // Plan aus einer Version vor 0.3.3 (laufende Simulation): aus der gemerkten Uhrzeit ableiten.
+                $p['done'] = 0;
+                foreach ($events as $ev) {
+                    if ($ev['at'] <= (int)($p['playedUpTo'] ?? 0)) {
+                        $p['done'] = max($p['done'], $ev['i'] + 1);
+                    }
+                }
+            }
             $due = null;
-            foreach ($this->scheduledEvents($ch, $p, $now) as $ev) {
-                if ($ev['at'] > $playedUpTo && $ev['at'] <= $now) {
-                    // Sind mehrere fällig (z. B. nach einem Ausfall von Symcon), zählt nur die letzte —
-                    // kein Durchschalten verpasster Zwischenstände.
+            foreach ($events as $ev) {
+                // Sind mehrere fällig (z. B. nach einem Ausfall von Symcon), zählt nur die letzte —
+                // kein Durchschalten verpasster Zwischenstände.
+                if ($ev['i'] >= (int)$p['done'] && $ev['at'] <= $now && ($due === null || $ev['i'] > $due['i'])) {
                     $due = $ev;
-                } elseif ($ev['at'] > $now && ($nextAt === null || $ev['at'] < $nextAt)) {
-                    $nextAt = $ev['at'];
-                    $nextText = $this->t('%1$s: %2$s → %3$s', date('H:i', $ev['at']), $this->channelName($ch), $this->fmtValue($ev['v']));
                 }
             }
             if ($due !== null) {
                 $this->execute($ch, $due['v'], $p['refDate']);
+                $p['done'] = $due['i'] + 1;
+            }
+            foreach ($events as $ev) {
+                if ($ev['i'] >= (int)$p['done'] && $ev['at'] > $now && ($nextAt === null || $ev['at'] < $nextAt)) {
+                    $nextAt = $ev['at'];
+                    $nextText = $this->t('%1$s: %2$s → %3$s', date('H:i', $ev['at']), $this->channelName($ch), $this->fmtValue($ev['v']));
+                }
             }
             $p['playedUpTo'] = $now;
             unset($p);
@@ -1242,32 +1398,81 @@ class DG65Anwesenheitssimulation extends IPSModule
      * Abstand zu Sonnenauf-/-untergang) und um den Tagesversatz verschoben.
      * Rückgabe: [['at' => ts, 'v' => Wert], ...] aufsteigend nach 'at'.
      */
-    private function scheduledEvents(array $ch, array $p, int $now): array
+    private function scheduledEvents(array $ch, array $p, int $now, ?array $brightToday = null): array
     {
         $tid = (int)$ch['TargetID'];
         $ref = (string)$p['refDate'];
         $jitter = (int)($p['jitterSec'] ?? 0);
         $timeRef = (int)($ch['TimeRef'] ?? self::TIMEREF_CLOCK);
-        $anchorKey = $timeRef === self::TIMEREF_SUNSET ? 'ss' : ($timeRef === self::TIMEREF_SUNRISE ? 'sr' : '');
-        $anchorToday = $anchorKey !== '' ? $this->anchorTs($timeRef === self::TIMEREF_SUNSET ? 'Sunset' : 'Sunrise', $now) : null;
+        // Welche Sonnenstände der Zeitbezug braucht ('ss' = Untergang, 'sr' = Aufgang).
+        $wanted = [
+            'sr' => in_array($timeRef, [self::TIMEREF_SUNRISE, self::TIMEREF_SUN, self::TIMEREF_BRIGHT], true) ? 'Sunrise' : '',
+            'ss' => in_array($timeRef, [self::TIMEREF_SUNSET, self::TIMEREF_SUN, self::TIMEREF_BRIGHT], true) ? 'Sunset' : '',
+        ];
+        // Der heutige Sonnenstand zu einem gelernten: derselbe Tagesabstand wie am Vorbild-Tag. Eine
+        // Schaltung um 01:00 hing am Untergang des VORABENDS und hängt heute wieder am Vorabend. Die
+        // Zuordnung hängt damit nicht von der aktuellen Uhrzeit ab — jede Schaltung hat den ganzen Tag
+        // über dieselbe Zeit (Voraussetzung für den Fortschritt als Zähler, siehe Tick()).
+        $refNoon = (int)strtotime($ref . ' 12:00:00');
+        $todayNoon = mktime(12, 0, 0, (int)date('n', $now), (int)date('j', $now), (int)date('Y', $now));
+        $cache = [];
+        $astroToday = function (string $key, int $refAnchor) use ($wanted, $refNoon, $todayNoon, &$cache): ?int {
+            if ($wanted[$key] === '') {
+                return null;
+            }
+            $anchorNoon = mktime(12, 0, 0, (int)date('n', $refAnchor), (int)date('j', $refAnchor), (int)date('Y', $refAnchor));
+            $shift = (int)round(($anchorNoon - $refNoon) / 86400);
+            if (!array_key_exists($key . $shift, $cache)) {
+                $cache[$key . $shift] = $this->anchorTs($wanted[$key], (int)strtotime(($shift >= 0 ? '+' : '') . $shift . ' day', $todayNoon));
+            }
+            return $cache[$key . $shift];
+        };
+        // "Außenhelligkeit": gemessene Dämmerung von heute und vom Vorbild-Tag. Fehlt eine von beiden
+        // (kein Sensor, keine Daten für den Vorbild-Tag), gilt für diese Tageshälfte der Sonnenstand.
+        $measuredToday = null;
+        $measuredRef = [0, 0];
+        if ($timeRef === self::TIMEREF_BRIGHT) {
+            $measuredToday = $brightToday ?? $this->brightAnchorsToday($now);
+            if ($measuredToday !== null) {
+                $measuredRef = $this->twilightOf($ref);
+            }
+        }
 
         $out = [];
+        $index = 0;
         foreach ($this->buffer($tid) as $ev) {
             $t = (int)$ev['t'];
             if (date('Y-m-d', $t) !== $ref) {
                 continue;
             }
-            if ($anchorToday !== null && isset($ev[$anchorKey])) {
-                $at = $anchorToday + ($t - (int)$ev[$anchorKey]);
+            // Je Tageshälfte ein Paar [Bezugszeit heute, Bezugszeit am Vorbild-Tag].
+            $pairs = [];
+            foreach (['sr' => 0, 'ss' => 1] as $key => $slot) {
+                if ($measuredToday !== null && ($measuredToday[$key] ?? null) !== null && (int)$measuredRef[$slot] > 0) {
+                    $pairs[$key] = [(int)$measuredToday[$key], (int)$measuredRef[$slot]];
+                } elseif (isset($ev[$key]) && ($sunToday = $astroToday($key, (int)$ev[$key])) !== null) {
+                    $pairs[$key] = [$sunToday, (int)$ev[$key]];
+                }
+            }
+            if (count($pairs) > 0) {
+                // Bei zwei Bezügen gilt der, der am Vorbild-Tag näher lag — die Schaltung am Morgen hängt
+                // am Aufgang, die am Abend am Untergang (Wunsch aus dem Forum, 18.11.2026).
+                $best = null;
+                foreach ($pairs as $pair) {
+                    if ($best === null || abs($t - $pair[1]) < abs($t - $best[1])) {
+                        $best = $pair;
+                    }
+                }
+                $at = $best[0] + ($t - $best[1]);
             } else {
                 // Uhrzeit des Vorbilds auf das heutige Kalenderdatum legen —
                 // per mktime(), nicht per Sekundenarithmetik (DST-sicher).
                 $at = mktime((int)date('G', $t), (int)date('i', $t), (int)date('s', $t), (int)date('n', $now), (int)date('j', $now), (int)date('Y', $now));
             }
-            $out[] = ['at' => $at + $jitter, 'v' => $ev['v']];
+            $out[] = ['at' => $at + $jitter, 'v' => $ev['v'], 'i' => $index++];
         }
         usort($out, function ($a, $b) {
-            return $a['at'] <=> $b['at'];
+            return [$a['at'], $a['i']] <=> [$b['at'], $b['i']];
         });
         return $out;
     }
@@ -1287,9 +1492,11 @@ class DG65Anwesenheitssimulation extends IPSModule
             }
             $refDate = (string)$plan['channels'][$tid]['refDate'];
             $lastDue = null;
+            $done = 0;
             foreach ($this->scheduledEvents($ch, $plan['channels'][$tid], $now) as $ev) {
                 if ($ev['at'] <= $now) {
                     $lastDue = $ev;
+                    $done = max($done, $ev['i'] + 1);
                 }
             }
             // Noch nichts vom Vorbild-Tag fällig (z. B. kurz nach
@@ -1304,6 +1511,7 @@ class DG65Anwesenheitssimulation extends IPSModule
                 }
             }
             $plan['channels'][$tid]['playedUpTo'] = $now;
+            $plan['channels'][$tid]['done'] = $done; // so viele Schaltungen des Vorbild-Tags gelten als erledigt
         }
     }
 
@@ -1671,6 +1879,244 @@ class DG65Anwesenheitssimulation extends IPSModule
             $out .= $char;
         }
         return $out;
+    }
+
+    /** Kurzzeit-Merker je Laufzeitpunkt, damit die Dämmerung in einem Tick nur einmal ermittelt wird. */
+    private $twMemo = [];
+
+    private function twilightID(): int
+    {
+        $id = @IPS_GetObjectIDByIdent('Twilight', $this->InstanceID);
+        return $id ? (int)$id : 0;
+    }
+
+    /** Gewählter Helligkeitssensor (Zahl-Variable), 0 = keiner. */
+    private function brightnessID(): int
+    {
+        $id = $this->ReadPropertyInteger('BrightnessID');
+        return $id > 0 && IPS_VariableExists($id) ? $id : 0;
+    }
+
+    /** Gemessene Dämmerung je Tag: 'JJJJ-MM-TT' => [morgens, abends] (0 = nicht gemessen). */
+    private function twilightStore(): array
+    {
+        if (!$this->twilightID()) {
+            return [];
+        }
+        $store = json_decode((string)$this->GetValue('Twilight'), true);
+        return is_array($store) ? $store : [];
+    }
+
+    private function saveTwilight(array $store): void
+    {
+        if (!$this->twilightID()) {
+            return;
+        }
+        ksort($store);
+        $this->SetValue('Twilight', json_encode((object)array_slice($store, -120, null, true)));
+        $this->twMemo = [];
+    }
+
+    /** Sonnenauf- und -untergang des Kalendertags von $ts als [Aufgang, Untergang]; null ohne Standort. */
+    private function sunOfDay(int $ts): ?array
+    {
+        $coords = $this->locationCoordinates();
+        if ($coords === null) {
+            return null;
+        }
+        $noon = mktime(12, 0, 0, (int)date('n', $ts), (int)date('j', $ts), (int)date('Y', $ts));
+        $info = @date_sun_info($noon, $coords[0], $coords[1]);
+        if (!is_array($info) || !is_int($info['sunrise'] ?? null) || !is_int($info['sunset'] ?? null) || $info['sunrise'] <= 0 || $info['sunset'] <= 0) {
+            return null;
+        }
+        return [$info['sunrise'], $info['sunset']];
+    }
+
+    /**
+     * Führt den Sensorwert nach: Bleibt er im Abendfenster 10 Minuten auf oder unter der Abendschwelle,
+     * gilt ab jetzt die Abenddämmerung; bleibt er im Morgenfenster 10 Minuten über der Morgenschwelle,
+     * die Morgendämmerung. Läuft immer mit (auch beim Lernen), damit die Vorbild-Tage ihre Dämmerung kennen.
+     */
+    private function trackBrightness(float $value, bool $fromTick): void
+    {
+        $now = $this->now();
+        $sun = $this->sunOfDay($now);
+        if ($sun === null) {
+            return;
+        }
+        $ymd = date('Y-m-d', $now);
+        $store = $this->twilightStore();
+        $entry = ($store[$ymd] ?? []) + [0, 0];
+        $track = json_decode($this->ReadAttributeString('BrightTrack'), true);
+        $track = (is_array($track) ? $track : []) + ['sr' => 0, 'ss' => 0];
+        $before = $track;
+        $changed = false;
+        $cases = [
+            'sr' => [0, $sun[0] - self::DAWN_BEFORE, $sun[0] + self::DAWN_AFTER, $this->ReadPropertyFloat('BrightnessDawn'), true],
+            'ss' => [1, $sun[1] - self::DUSK_BEFORE, $sun[1] + self::DUSK_AFTER, $this->ReadPropertyFloat('BrightnessDusk'), false],
+        ];
+        foreach ($cases as $key => [$slot, $from, $to, $threshold, $above]) {
+            $met = $threshold > 0 && $now >= $from && $now <= $to && (int)$entry[$slot] === 0
+                && ($above ? $value > $threshold : $value <= $threshold);
+            if (!$met) {
+                $track[$key] = 0;
+            } elseif ((int)$track[$key] === 0) {
+                $track[$key] = $now;
+            } elseif ($now - (int)$track[$key] >= self::TWILIGHT_SUSTAIN) {
+                $entry[$slot] = $now;
+                $track[$key] = 0;
+                $changed = true;
+            }
+        }
+        if ($track != $before) {
+            $this->WriteAttributeString('BrightTrack', json_encode($track));
+        }
+        if ($changed) {
+            $store[$ymd] = $entry;
+            $this->saveTwilight($store);
+            $this->SendDebug('Twilight', 'measured ' . date('H:i:s', $now) . ' (value ' . $value . ')', 0);
+            if (!$fromTick && $this->isActive()) {
+                $this->Tick(); // Schaltungen, die an der Dämmerung hängen, sofort neu einordnen
+            }
+        }
+    }
+
+    /** Dämmerung eines Tages aus dem Archiv des Sensors: [morgens, abends], 0 = nicht feststellbar. */
+    private function twilightFromArchive(string $ymd, int $upTo): array
+    {
+        $sensor = $this->brightnessID();
+        $archive = IPS_GetInstanceListByModuleID(self::ARCHIVE_GUID)[0] ?? 0;
+        $sun = $this->sunOfDay((int)strtotime($ymd . ' 12:00:00'));
+        if ($sensor === 0 || !$archive || $sun === null || !AC_GetLoggingStatus($archive, $sensor)) {
+            return [0, 0];
+        }
+        $find = function (int $from, int $to, float $threshold, bool $above) use ($archive, $sensor, $upTo): int {
+            $end = min($to + self::TWILIGHT_SUSTAIN, $upTo);
+            if ($threshold <= 0 || $from >= $end) {
+                return 0;
+            }
+            $since = 0;
+            foreach (array_reverse(AC_GetLoggedValues($archive, $sensor, $from, $end, 0)) as $row) {
+                $t = (int)($row['TimeStamp'] ?? 0);
+                $value = (float)($row['Value'] ?? 0);
+                if (!($above ? $value > $threshold : $value <= $threshold)) {
+                    $since = 0;
+                    continue;
+                }
+                if ($since === 0) {
+                    if ($t > $to) {
+                        break;
+                    }
+                    $since = $t;
+                }
+                if ($t - $since >= self::TWILIGHT_SUSTAIN) {
+                    return $since + self::TWILIGHT_SUSTAIN;
+                }
+            }
+            // Der Sensor meldet bei gleichbleibendem Wert oft nichts mehr: kein Gegenwert bis zum Ende = bestätigt.
+            return $since > 0 && $end - $since >= self::TWILIGHT_SUSTAIN ? $since + self::TWILIGHT_SUSTAIN : 0;
+        };
+        return [
+            $find($sun[0] - self::DAWN_BEFORE, $sun[0] + self::DAWN_AFTER, $this->ReadPropertyFloat('BrightnessDawn'), true),
+            $find($sun[1] - self::DUSK_BEFORE, $sun[1] + self::DUSK_AFTER, $this->ReadPropertyFloat('BrightnessDusk'), false),
+        ];
+    }
+
+    /** Gemessene Dämmerung eines vergangenen Tages: aus dem eigenen Speicher, sonst einmalig aus dem Archiv. */
+    private function twilightOf(string $ymd): array
+    {
+        $store = $this->twilightStore();
+        if (!isset($store[$ymd])) {
+            $store[$ymd] = $this->twilightFromArchive($ymd, (int)strtotime($ymd . ' 23:59:59'));
+            $this->saveTwilight($store);
+        }
+        return $store[$ymd] + [0, 0];
+    }
+
+    /**
+     * Bezugszeiten von heute für "Außenhelligkeit": ['sr' => morgens, 'ss' => abends], null = nicht nutzbar.
+     * Gemessen, sobald der Sensor die Dämmerung bestätigt hat. Davor die übliche Zeit (Sonnenstand plus
+     * mittlerer Abstand der letzten Tage). Ist die übliche Zeit vorbei und es ist noch hell (bzw. dunkel),
+     * wird bis zur Bestätigung gewartet, längstens bis zum Ende des Fensters.
+     */
+    private function brightAnchorsToday(int $now): ?array
+    {
+        if (array_key_exists($now, $this->twMemo)) {
+            return $this->twMemo[$now];
+        }
+        $sun = $this->brightnessID() > 0 ? $this->sunOfDay($now) : null;
+        if ($sun === null) {
+            return $this->twMemo[$now] = null;
+        }
+        $ymd = date('Y-m-d', $now);
+        $store = $this->twilightStore();
+        $entry = ($store[$ymd] ?? []) + [0, 0];
+        if (((int)$entry[0] === 0 && $now > $sun[0] - self::DAWN_BEFORE) || ((int)$entry[1] === 0 && $now > $sun[1] - self::DUSK_BEFORE)) {
+            // Nach einem Neustart oder frisch eingerichtet: was heute schon geschehen ist, steht im Archiv.
+            $known = $this->twilightFromArchive($ymd, $now);
+            $dirty = false;
+            foreach ([0, 1] as $slot) {
+                if ((int)$entry[$slot] === 0 && $known[$slot] > 0) {
+                    $entry[$slot] = $known[$slot];
+                    $dirty = true;
+                }
+            }
+            if ($dirty) {
+                $store[$ymd] = $entry;
+                $this->saveTwilight($store);
+            }
+        }
+        // Mittlerer Abstand der gemessenen Dämmerung zum Sonnenstand (Median der gespeicherten Tage).
+        $diffs = [[], []];
+        foreach ($store as $day => $values) {
+            $daySun = $day !== $ymd ? $this->sunOfDay((int)strtotime($day . ' 12:00:00')) : null;
+            if ($daySun === null) {
+                continue;
+            }
+            foreach ([0, 1] as $slot) {
+                if ((int)($values[$slot] ?? 0) > 0) {
+                    $diffs[$slot][] = (int)$values[$slot] - $daySun[$slot];
+                }
+            }
+        }
+        $median = function (array $list): int {
+            if (count($list) === 0) {
+                return 0;
+            }
+            sort($list);
+            return (int)$list[intdiv(count($list), 2)];
+        };
+        $out = ['sr' => null, 'ss' => null];
+        if ($this->ReadPropertyFloat('BrightnessDawn') > 0) {
+            $usual = $sun[0] + max(-self::DAWN_BEFORE, min(self::DAWN_AFTER, $median($diffs[0])));
+            $out['sr'] = (int)$entry[0] > 0 ? (int)$entry[0] : ($now >= $usual ? $sun[0] + self::DAWN_AFTER : $usual);
+        }
+        if ($this->ReadPropertyFloat('BrightnessDusk') > 0) {
+            $usual = $sun[1] + max(-self::DUSK_BEFORE, min(self::DUSK_AFTER, $median($diffs[1])));
+            $out['ss'] = (int)$entry[1] > 0 ? (int)$entry[1] : ($now >= $usual ? $sun[1] + self::DUSK_AFTER : $usual);
+        }
+        return $this->twMemo[$now] = $out;
+    }
+
+    /** Was der Helligkeitssensor gerade sagt (Formular, Untergruppe "Außenhelligkeit"). */
+    private function brightnessStatusText(): string
+    {
+        $sensor = $this->brightnessID();
+        if ($sensor === 0) {
+            return 'ℹ️ No brightness sensor chosen — the time reference "Outside brightness" then behaves like "Sunrise and sunset".';
+        }
+        $store = $this->twilightStore();
+        $entry = ($store[date('Y-m-d', $this->now())] ?? []) + [0, 0];
+        $days = 0;
+        foreach ($store as $values) {
+            if ((int)($values[0] ?? 0) > 0 || (int)($values[1] ?? 0) > 0) {
+                $days++;
+            }
+        }
+        $time = function ($ts): string {
+            return (int)$ts > 0 ? date('H:i', (int)$ts) : '–';
+        };
+        return $this->t('ℹ️ Sensor now: %1$s. Measured today: dawn %2$s, dusk %3$s. Days with measured twilight: %4$s.', (string)GetValueFormatted($sensor), $time($entry[0]), $time($entry[1]), $days);
     }
 
     /** Wohin Meldungen gehen (Formular, Untergruppe "Meldungen"). */
@@ -2216,8 +2662,12 @@ class DG65Anwesenheitssimulation extends IPSModule
                 ['type' => 'Label', 'caption' => 'The switch "Simulation active" below the instance does the same — also from WebFront/tile, by event or script.'],
                 ['type' => 'ExpansionPanel', 'expanded' => false, 'caption' => '▶️  Start and end', 'items' => [
                     ['type' => 'SelectVariable', 'name' => 'TriggerID', 'caption' => 'Trigger variable (optional)'],
-                    ['type' => 'ValidationTextBox', 'name' => 'TriggerValues', 'caption' => 'Values that mean "simulate" (number/text variables, comma-separated, e.g. 3,4)', 'width' => '100%'], // volle Breite, sonst wird die Beschriftung abgeschnitten (Bildschirmfoto Dietmar 18.11.2026)
-                    ['type' => 'CheckBox', 'name' => 'TriggerInvert', 'caption' => 'Invert trigger (simulate while the condition is NOT met, e.g. a variable "Present")'],
+                    // Beschriftungen höchstens 40 Zeichen, die Erklärung als <Feld>Hint direkt dahinter (SUITE.md
+                    // "Beschriftung von Eingabefeldern", 17.11.2026; der Prüfstand misst das fertige Formular in DE und EN).
+                    ['type' => 'ValidationTextBox', 'name' => 'TriggerValues', 'caption' => 'Values for "simulate"'],
+                    ['type' => 'Label', 'name' => 'TriggerValuesHint', 'caption' => 'Values that mean "simulate" (number/text variables, comma-separated, e.g. 3,4)'],
+                    ['type' => 'CheckBox', 'name' => 'TriggerInvert', 'caption' => 'Invert trigger'],
+                    ['type' => 'Label', 'name' => 'TriggerInvertHint', 'caption' => 'Invert trigger (simulate while the condition is NOT met, e.g. a variable "Present")'],
                     ['type' => 'NumberSpinner', 'name' => 'TriggerDelay', 'caption' => 'Start delay', 'suffix' => ' min', 'minimum' => 0, 'maximum' => 720],
                     ['type' => 'Label', 'name' => 'TriggerStatus', 'caption' => $this->triggerStatusText()],
                     ['type' => 'Label', 'caption' => 'ℹ️ Boolean variable: TRUE starts, FALSE stops. Number or text variable (e.g. a house mode): the simulation runs while the value is one of the listed values. The start can be delayed so that a short errand does not start it; stopping always takes effect immediately. The switch "Simulation active" always stays operable by hand.'],
@@ -2229,15 +2679,28 @@ class DG65Anwesenheitssimulation extends IPSModule
                 ]],
                 ['type' => 'ExpansionPanel', 'expanded' => false, 'caption' => '🧠  Learning and reference day', 'items' => [
                     ['type' => 'NumberSpinner', 'name' => 'LearnDays', 'caption' => 'Learning window', 'suffix' => ' days', 'minimum' => 7, 'maximum' => 365],
-                    ['type' => 'CheckBox', 'name' => 'CoherentReplay', 'caption' => 'All channels replay the same reference day (the order between rooms stays real)'],
-                    ['type' => 'NumberSpinner', 'name' => 'MinDayEvents', 'caption' => 'Minimum switching events per reference day', 'minimum' => 0, 'maximum' => 500],
-                    ['type' => 'Label', 'caption' => 'ℹ️ A learned day only serves as reference if at least this many switching events were recorded on it (all channels together) — so a day on which nobody was home is not replayed. 0 = no minimum.'],
-                    ['type' => 'Select', 'name' => 'HolidayRegion', 'caption' => 'Public holidays (replayed like Sundays)', 'options' => $regions],
+                    ['type' => 'CheckBox', 'name' => 'CoherentReplay', 'caption' => 'Same reference day for all channels'],
+                    ['type' => 'Label', 'name' => 'CoherentReplayHint', 'caption' => 'All channels replay the same reference day (the order between rooms stays real)'],
+                    ['type' => 'NumberSpinner', 'name' => 'MinDayEvents', 'caption' => 'Min. switchings per reference day', 'minimum' => 0, 'maximum' => 500],
+                    ['type' => 'Label', 'name' => 'MinDayEventsHint', 'caption' => 'ℹ️ A learned day only serves as reference if at least this many switching events were recorded on it (all channels together) — so a day on which nobody was home is not replayed. 0 = no minimum.'],
+                    ['type' => 'Select', 'name' => 'HolidayRegion', 'caption' => 'Public holidays', 'options' => $regions],
+                    ['type' => 'Label', 'name' => 'HolidayRegionHint', 'caption' => 'Public holidays of the chosen region are replayed like Sundays.'],
                     ['type' => 'Label', 'caption' => $astro],
                 ]],
+                ['type' => 'ExpansionPanel', 'expanded' => false, 'caption' => '🌤  Outside brightness (optional)', 'items' => [
+                    ['type' => 'SelectVariable', 'name' => 'BrightnessID', 'caption' => 'Brightness sensor'],
+                    ['type' => 'Label', 'name' => 'BrightnessIDHint', 'caption' => 'A brightness or irradiance sensor outdoors, e.g. from a weather station (lux or W/m²). Only needed for channels with the time reference "Outside brightness".'],
+                    ['type' => 'Button', 'caption' => '🔎 Find brightness sensor', 'onClick' => 'echo ANWSIM_FindBrightness($id);'],
+                    ['type' => 'NumberSpinner', 'name' => 'BrightnessDusk', 'caption' => 'Evening threshold (dark below)', 'digits' => 1, 'minimum' => 0, 'maximum' => 200000],
+                    ['type' => 'NumberSpinner', 'name' => 'BrightnessDawn', 'caption' => 'Morning threshold (bright above)', 'digits' => 1, 'minimum' => 0, 'maximum' => 200000],
+                    ['type' => 'Label', 'name' => 'BrightnessDawnHint', 'caption' => 'Dusk counts once the value has stayed at or below the evening threshold for 10 minutes, dawn once it has stayed above the morning threshold for 10 minutes. The replay then uses these measured moments instead of the calculated sun position — under dark clouds lights come on earlier and go off later. 0 = not used.'],
+                    ['type' => 'Button', 'caption' => '📈 Suggest thresholds', 'onClick' => 'echo ANWSIM_SuggestBrightness($id, $BrightnessID);'],
+                    ['type' => 'Label', 'name' => 'BrightnessStatus', 'caption' => $this->brightnessStatusText()],
+                ]],
                 ['type' => 'ExpansionPanel', 'expanded' => false, 'caption' => '🔔  Notifications', 'items' => [
-                    ['type' => 'CheckBox', 'name' => 'NotifyFailure', 'caption' => 'Notify when a switching fails (at most once per channel and day)'],
-                    ['type' => 'CheckBox', 'name' => 'NotifyStartStop', 'caption' => 'Notify when the simulation starts or stops'],
+                    ['type' => 'CheckBox', 'name' => 'NotifyFailure', 'caption' => 'Notify on failed switching'],
+                    ['type' => 'Label', 'name' => 'NotifyFailureHint', 'caption' => 'Notify when a switching fails (at most once per channel and day)'],
+                    ['type' => 'CheckBox', 'name' => 'NotifyStartStop', 'caption' => 'Notify on start and stop'],
                     [
                         'type' => 'List', 'name' => 'NotifyTargets', 'caption' => 'Send to these visualizations (empty = all)', 'rowCount' => 3, 'add' => true, 'delete' => true,
                         'columns' => [
@@ -2296,7 +2759,7 @@ class DG65Anwesenheitssimulation extends IPSModule
                 ['type' => 'Button', 'caption' => '🔎 Find suitable variables', 'onClick' => 'echo ANWSIM_Discover($id);'],
                 ['type' => 'Label', 'name' => 'DiscoverStatus', 'caption' => 'ℹ️ Not searched yet. The search lists logged, switchable variables that are switched regularly — nothing is created without your confirmation.'],
                 [
-                    'type' => 'List', 'name' => 'Suggestions', 'caption' => 'Suggestions', 'rowCount' => 8, 'visible' => false, 'values' => [],
+                    'type' => 'List', 'name' => 'Suggestions', 'caption' => 'Suggestions', 'rowCount' => 12, 'visible' => false, 'values' => [],
                     // Keine Eigenschaft: nichts davon wird gespeichert (Muster wie im DG65-Toolkit Automat).
                     'add' => false, 'delete' => false, 'loadValuesFromConfiguration' => false,
                     'columns' => [
@@ -2311,7 +2774,7 @@ class DG65Anwesenheitssimulation extends IPSModule
                 ],
                 ['type' => 'Button', 'name' => 'AddSuggestions', 'visible' => false, 'caption' => '➕ Add ticked as channels', 'onClick' => '$s = []; foreach ($Suggestions as $x) { $s[] = $x; } $c = []; foreach ($Channels as $x) { $c[] = $x; } echo ANWSIM_AddSuggestions($id, json_encode($s), json_encode($c));'],
                 [
-                    'type' => 'List', 'name' => 'Channels', 'caption' => 'Channels', 'rowCount' => 8, 'add' => true, 'delete' => true,
+                    'type' => 'List', 'name' => 'Channels', 'caption' => 'Channels', 'rowCount' => min(25, max(8, count($this->channels()) + 2)), 'add' => true, 'delete' => true,
                     'columns' => [
                         ['caption' => 'Name', 'name' => 'Caption', 'width' => '180px', 'add' => '', 'edit' => ['type' => 'ValidationTextBox']],
                         ['caption' => 'Target variable', 'name' => 'TargetID', 'width' => 'auto', 'add' => 0, 'edit' => ['type' => 'SelectVariable']],
@@ -2320,10 +2783,12 @@ class DG65Anwesenheitssimulation extends IPSModule
                             ['caption' => 'Learn + replay', 'value' => self::MODE_LEARN_PLAY],
                             ['caption' => 'Learn only (never switch)', 'value' => self::MODE_LEARN_ONLY],
                         ]]],
-                        ['caption' => 'Time reference', 'name' => 'TimeRef', 'width' => '170px', 'add' => self::TIMEREF_CLOCK, 'edit' => ['type' => 'Select', 'options' => [
+                        ['caption' => 'Time reference', 'name' => 'TimeRef', 'width' => '230px', 'add' => self::TIMEREF_CLOCK, 'edit' => ['type' => 'Select', 'options' => [
                             ['caption' => 'Clock time', 'value' => self::TIMEREF_CLOCK],
                             ['caption' => 'Sunset', 'value' => self::TIMEREF_SUNSET],
                             ['caption' => 'Sunrise', 'value' => self::TIMEREF_SUNRISE],
+                            ['caption' => 'Sunrise and sunset', 'value' => self::TIMEREF_SUN],
+                            ['caption' => 'Outside brightness', 'value' => self::TIMEREF_BRIGHT],
                         ]]],
                         ['caption' => 'Max. offset', 'name' => 'JitterMin', 'width' => '130px', 'add' => 10, 'edit' => ['type' => 'NumberSpinner', 'suffix' => ' min', 'minimum' => 0, 'maximum' => 180]],
                     ],
@@ -2333,12 +2798,15 @@ class DG65Anwesenheitssimulation extends IPSModule
                     'items' => [
                         ['type' => 'Label', 'caption' => 'Mode — "Learn + replay": the normal case. "Learn only": observes only, never switches (for trying out). "Off": channel paused, learned data kept.'],
                         ['type' => 'Label', 'caption' => 'Time reference — "Clock time": the switching is replayed at the same time of day as on the reference day. "Sunset"/"Sunrise": at the same distance before/after the sun position — useful for lighting that follows dusk. Requires Symcon Location Control.'],
+                        ['type' => 'Label', 'caption' => '"Sunrise and sunset": each switching follows whichever of the two was closer on the reference day — mornings sunrise, evenings sunset.'],
+                        ['type' => 'Label', 'caption' => '"Outside brightness": like "Sunrise and sunset", but dusk and dawn are measured by your brightness sensor instead of calculated. Needs a sensor and thresholds in the panel "Simulation"; without them the channel follows the sun position.'],
                         ['type' => 'Label', 'caption' => 'Max. offset — largest random time shift per day in minutes (± around the reference time). 0 = exactly as on the reference day; 10–20 look natural. With "shared reference day" all channels get the same relative offset, the order is kept.'],
                     ],
                 ]],
                 ['type' => 'Button', 'caption' => '📥 Fill learning memory from archive', 'onClick' => 'echo ANWSIM_ImportArchive($id);'],
                 ['type' => 'Label', 'caption' => 'ℹ️ If a target variable is logged in the Symcon archive, the module takes over its switching history for the learning window — automatically when a channel is created, with this button for existing channels. Your own learned data is kept; only the time before it is filled.'],
-                ['type' => 'ValidationTextBox', 'name' => 'BlockedWords', 'caption' => 'Never switch devices whose name contains one of these words (comma-separated)', 'width' => '100%'],
+                ['type' => 'ValidationTextBox', 'name' => 'BlockedWords', 'caption' => 'Never switch these devices', 'width' => '100%'],
+                ['type' => 'Label', 'name' => 'BlockedWordsHint', 'caption' => 'Never switch devices whose name contains one of these words (comma-separated)'],
                 ['type' => 'Label', 'caption' => 'ℹ️ Safety: heating appliances such as toasters or irons do not belong in a presence simulation, refrigerators must never go off, and door locks, garage doors or awnings must not move while nobody is home. Channels whose name, variable, device or profile contains one of these words are never switched and never suggested. Adjust the list to your installation.'],
                 ['type' => 'Label', 'name' => 'ChannelSummary', 'caption' => $this->channelSummaryText()],
             ],

@@ -74,6 +74,7 @@ function IPS_GetObjectIDByIdent(string $ident, int $parent) {
     foreach ($GLOBALS['VARS'] as $id => $v) { if ($v['ident'] === $ident && $v['parent'] === $parent) { return $id; } }
     return false;
 }
+function IPS_GetVariableList(): array { return array_keys($GLOBALS['VARS']); }
 function IPS_GetChildrenIDs(int $parent): array { $o = []; foreach ($GLOBALS['VARS'] as $id => $v) { if ($v['parent'] === $parent) { $o[] = $id; } } return $o; }
 function IPS_GetObject(int $id): array { return ['ObjectIdent' => $GLOBALS['VARS'][$id]['ident'] ?? '', 'ObjectName' => $GLOBALS['VARS'][$id]['name'] ?? '']; }
 function IPS_DeleteVariable(int $id): bool { unset($GLOBALS['VARS'][$id]); return true; }
@@ -113,6 +114,8 @@ class IPSModule
     public function ReadPropertyString(string $n): string { return $this->props[$n]; }
     public function ReadPropertyInteger(string $n): int { return $this->props[$n]; }
     public function ReadPropertyBoolean(string $n): bool { return $this->props[$n]; }
+    public function RegisterPropertyFloat(string $n, float $d): void { if (!array_key_exists($n, $this->props)) { $this->props[$n] = $d; } }
+    public function ReadPropertyFloat(string $n): float { return (float)$this->props[$n]; }
     public function RegisterAttributeString(string $n, string $d): void { if (!array_key_exists($n, $this->attrs)) { $this->attrs[$n] = $d; } }
     public function RegisterAttributeInteger(string $n, int $d): void { if (!array_key_exists($n, $this->attrs)) { $this->attrs[$n] = $d; } }
     public function RegisterAttributeBoolean(string $n, bool $d): void { if (!array_key_exists($n, $this->attrs)) { $this->attrs[$n] = $d; } }
@@ -500,7 +503,7 @@ $raw = rawForm($m); $rawTxt = formText($raw);
 check('Rohes Formular (deutsches Symcon): statische Captions bleiben englisch, Konsole übersetzt', str_contains($rawTxt, '"caption":"📖  Documentation & help"') && str_contains($rawTxt, '"caption":"Channels"') && ($raw['status'][0]['caption'] ?? '') === 'Active — channels configured, the module is learning or replaying', mb_substr($rawTxt, 0, 160));
 $rawSum = ''; $wk = function ($items) use (&$wk, &$rawSum) { foreach ($items as $e) { if (($e['name'] ?? '') === 'ChannelSummary') { $rawSum = $e['caption']; } if (isset($e['items'])) { $wk($e['items']); } } }; $wk($raw['elements']);
 check('Rohes Formular: Statuszeilen MIT Werten sind selbst übersetzt (Konsole könnte sie nicht)', str_contains($rawSum, 'Schaltvorgänge seit') || str_contains($rawSum, 'noch nichts gelernt'), $rawSum);
-check('Statische Formulartexte: jeder Caption-Text steht in locale.json (sonst bliebe er in der Konsole englisch)', (function () use ($raw) { $miss = []; $w = function ($node) use (&$w, &$miss) { foreach (['caption', 'suffix'] as $k) { if (isset($node[$k]) && is_string($node[$k]) && $node[$k] !== '' && !isset($GLOBALS['DE'][$node[$k]]) && preg_match('/[a-z]{3,}/', $node[$k]) && !preg_match('/\d\d\.\d\d\.\d{4}|ANWSIM_|Version |switching event|channel\(s\)/', $node[$k]) && !in_array($node['name'] ?? '', ['SimStatus', 'ChannelSummary', 'TriggerStatus', 'NotifyStatus'], true)) { $miss[] = $node[$k]; } } foreach (['items', 'columns', 'options', 'elements', 'status'] as $k) { if (isset($node[$k])) { foreach ($node[$k] as $c) { if (is_array($c)) { $w($c); } } } } foreach (['edit', 'popup'] as $k) { if (isset($node[$k])) { $w($node[$k]); } } }; $w($raw); $GLOBALS['MISS'] = $miss; return $miss === []; })(), implode(' | ', array_slice($GLOBALS['MISS'] ?? [], 0, 5)));
+check('Statische Formulartexte: jeder Caption-Text steht in locale.json (sonst bliebe er in der Konsole englisch)', (function () use ($raw) { $miss = []; $w = function ($node) use (&$w, &$miss) { foreach (['caption', 'suffix'] as $k) { if (isset($node[$k]) && is_string($node[$k]) && $node[$k] !== '' && !isset($GLOBALS['DE'][$node[$k]]) && preg_match('/[a-z]{3,}/', $node[$k]) && !preg_match('/\d\d\.\d\d\.\d{4}|ANWSIM_|Version |switching event|channel\(s\)/', $node[$k]) && !in_array($node['name'] ?? '', ['SimStatus', 'ChannelSummary', 'TriggerStatus', 'NotifyStatus', 'BrightnessStatus'], true)) { $miss[] = $node[$k]; } } foreach (['items', 'columns', 'options', 'elements', 'status'] as $k) { if (isset($node[$k])) { foreach ($node[$k] as $c) { if (is_array($c)) { $w($c); } } } } foreach (['edit', 'popup'] as $k) { if (isset($node[$k])) { $w($node[$k]); } } }; $w($raw); $GLOBALS['MISS'] = $miss; return $miss === []; })(), implode(' | ', array_slice($GLOBALS['MISS'] ?? [], 0, 5)));
 // (b) Statisch: jeder t('…')-Text im Code steht in locale.json, Platzhalter stimmen, keine Umlaute in Code-Zeichenketten.
 $src = file_get_contents(dirname(__DIR__) . '/DG65Anwesenheitssimulation/module.php');
 $toks = token_get_all($src);
@@ -511,7 +514,7 @@ for ($i = 0; $i < $n; $i++) {
         $raw = $toks[$i][1];
         $val = $raw[0] === "'" ? str_replace(["\\'", '\\\\'], ["'", '\\'], substr($raw, 1, -1)) : stripcslashes(substr($raw, 1, -1));
         // Ausnahmen sind Daten, keine Oberflächentexte: die Geräte-Wortliste (Vorgabe von BlockedWords) und der Eigenname Baden-Württemberg.
-        if (preg_match('/[äöüÄÖÜß„“]/u', $val) && !str_starts_with($val, 'Toaster, ') && $val !== 'Baden-Württemberg') { $umlautStrings[] = mb_substr($val, 0, 40); }
+        if (preg_match('/[äöüÄÖÜß„“]/u', $val) && !str_starts_with($val, 'Toaster, ') && $val !== 'Baden-Württemberg' && !str_starts_with($val, '/')) { $umlautStrings[] = mb_substr($val, 0, 40); }
         // t('…' direkt davor?
         $j = $i - 1; while ($j > 0 && is_array($toks[$j]) && $toks[$j][0] === T_WHITESPACE) { $j--; }
         if (($toks[$j] ?? '') === '(' ) { $k = $j - 1; if (is_array($toks[$k]) && $toks[$k][1] === 't' && ($toks[$k - 1] ?? '') !== '' && is_array($toks[$k - 1]) && $toks[$k - 1][0] === T_OBJECT_OPERATOR) { $tTexts[] = $val; } }
@@ -944,6 +947,127 @@ clock('2026-05-19 12:00:00');
 check('Übersicht je Wochentag, heute zählt nicht mit, fehlende Tage als „–"', str_contains(formText(form($m15)), 'Vorbild-Tage: Mo 2 · Di 1 · Mi – · Do 1 · Fr – · Sa – · So –.'), formText(form($m15)));
 $m15->props['HolidayRegion'] = 'BW'; $m15->ApplyChanges();
 check('Mit Feiertags-Region zählt Himmelfahrt (Do 14.05.) als Sonntag', str_contains(formText(form($m15)), 'Vorbild-Tage: Mo 2 · Di 1 · Mi – · Do – · Fr – · Sa – · So 1.'), '');
+
+heading('29. Zeitbezug „Sonnenauf- und -untergang" (0.3.3, Wunsch aus dem Forum)');
+mkvar(10445, VARIABLETYPE_INTEGER, 0, 'Sonnenaufgang', 'Sunrise', 10443);
+$sunOf = function (string $ymd): array { $i = date_sun_info(strtotime("$ymd 12:00:00"), 48.47, 7.94); return [$i['sunrise'], $i['sunset']]; };
+$setSun = function (string $ymd) use ($sunOf): void { [$sr, $ss] = $sunOf($ymd); $GLOBALS['VARS'][10445]['value'] = $sr; $GLOBALS['VARS'][10444]['value'] = $ss; };
+$at = function (int $ts): void { $GLOBALS['CLOCK'] = $ts; };
+mkvar(800, VARIABLETYPE_BOOLEAN, false, 'Hoflicht', '', 1, true);
+clock('2026-11-02 12:00:00');
+$m16 = $mk(720, [['Caption' => 'Hoflicht', 'TargetID' => 800, 'Mode' => 1, 'TimeRef' => 3, 'JitterMin' => 0]]); $m16->props['MinDayEvents'] = 0; $m16->ApplyChanges();
+[$sr9, $ss9] = $sunOf('2026-11-09'); $setSun('2026-11-09');
+// Vorbild Mo 09.11.: morgens eine Stunde vor Sonnenaufgang an, 20 min danach aus; abends 10 min nach Untergang an, 4 h später aus.
+foreach ([[$sr9 - 3600, true], [$sr9 + 1200, false], [$ss9 + 600, true], [$ss9 + 14400, false]] as [$ts9, $v]) { $at($ts9); fire($m16, 800, $v); }
+[$sr23, $ss23] = $sunOf('2026-11-23'); $setSun('2026-11-23'); clock('2026-11-23 03:00:00');
+$want = date('H:i', $sr23 - 3600) . ' An, ' . date('H:i', $sr23 + 1200) . ' Aus, ' . date('H:i', $ss23 + 600) . ' An, ' . date('H:i', $ss23 + 14400) . ' Aus';
+check('Zwei Wochen später: Morgen-Schaltungen hängen am Sonnenaufgang, Abend-Schaltungen am Sonnenuntergang', str_contains($m16->Preview(), $want), $m16->Preview() . ' / erwartet ' . $want);
+$m16->props['Channels'] = json_encode([['Caption' => 'Hoflicht', 'TargetID' => 800, 'Mode' => 1, 'TimeRef' => 1, 'JitterMin' => 0]]); $m16->ApplyChanges();
+check('Zum Vergleich „nur Sonnenuntergang": die Morgen-Schaltung läge dann woanders', !str_contains($m16->Preview(), date('H:i', $sr23 - 3600) . ' An') && str_contains($m16->Preview(), date('H:i', $ss23 + 600) . ' An'), $m16->Preview());
+// Nachts gestartet: Die Abend-Schaltung gehört zum HEUTIGEN Sonnenuntergang, nicht zum gestrigen (der um 03:00 näher liegt).
+$GLOBALS['VARS'][800]['value'] = false; $n = count($GLOBALS['ACTIONS']); $m16->SetActive(true);
+$at($ss23 + 600 - 1); $m16->Tick(); $early = count(array_filter(actionsFrom($n), fn($a) => $a[2] === true && $a[0] > $ss23));
+$at($ss23 + 600); $m16->Tick();
+check('Um 03:00 gestartet: die Abend-Schaltung kommt heute 10 min nach Sonnenuntergang (nicht als „schon vorbei" verworfen)', $early === 0 && count(array_filter(actionsFrom($n), fn($a) => $a[0] === $ss23 + 600 && $a[2] === true)) === 1, json_encode(actionsFrom($n)));
+$m16->SetActive(false); clock('2026-11-23 03:00:00');
+check('Auswahl im Formular vorhanden, Kanalliste wächst mit (mindestens 8 Zeilen)', str_contains(formText(form($m16)), '"caption":"Sonnenauf- und -untergang","value":3') && str_contains(formText(form($m16)), '"caption":"Außenhelligkeit","value":4') && str_contains(formText(form($m16)), '"name":"Channels","caption":"Kanäle","rowCount":8'), '');
+$many = []; for ($k = 0; $k < 30; $k++) { $many[] = ['Caption' => 'K' . $k, 'TargetID' => 800, 'Mode' => 2, 'TimeRef' => 0, 'JitterMin' => 0]; }
+$m16->props['Channels'] = json_encode($many); $m16->ApplyChanges();
+check('Viele Kanäle: Liste zeigt bis zu 25 Zeilen (Wunsch aus dem Forum: Fenster war zu niedrig)', str_contains(formText(form($m16)), '"name":"Channels","caption":"Kanäle","rowCount":25'));
+
+heading('30. Zeitbezug „Außenhelligkeit": gemessene Dämmerung statt Sonnenstand (0.3.3)');
+$GLOBALS['ARCHIVE'] = []; $GLOBALS['ARCHIVE_INST'] = [53244];
+$GLOBALS['INSTANCES'][9200] = 'Wetterstation'; $GLOBALS['INSTANCES'][9201] = 'Sensor Flur'; $GLOBALS['INSTANCES'][9202] = 'WB 1';
+mkvar(810, VARIABLETYPE_FLOAT, 500.0, 'Solar Einstrahlung', '', 9200, false); $GLOBALS['PROFILES'][810] = ['~Illumination', ''];
+mkvar(811, VARIABLETYPE_FLOAT, 20.0, 'Sensor Multilevel (Beleuchtung)', '', 9201, false); $GLOBALS['PROFILES'][811] = ['Illumination', ''];
+mkvar(812, VARIABLETYPE_INTEGER, 255, 'LED Helligkeit', '', 9202, true); $GLOBALS['PROFILES'][812] = ['~Intensity.255', ''];
+mkvar(820, VARIABLETYPE_BOOLEAN, false, 'Terrassenlicht', '', 1, true); mkvar(821, VARIABLETYPE_BOOLEAN, false, 'Flurlampe', '', 1, true);
+// Sensor-Archiv eines klaren Tages: abends 20 min vor Sonnenuntergang unter 50, morgens 10 min nach Sonnenaufgang über 50.
+// Mit der 10-Minuten-Regel: gemessene Abenddämmerung = Untergang - 10 min, Morgendämmerung = Aufgang + 20 min.
+$clearDay = function (string $ymd, bool $evening = true) use ($sunOf): void { [$sr, $ss] = $sunOf($ymd);
+    for ($x = $sr - 5400; $x <= $sr + 7800; $x += 300) { $GLOBALS['ARCHIVE'][810][] = [$x, $x >= $sr + 600 ? 500.0 : 10.0]; }
+    if ($evening) { for ($x = $ss - 7200; $x <= $ss + 6000; $x += 300) { $GLOBALS['ARCHIVE'][810][] = [$x, $x >= $ss - 1200 ? 10.0 : 500.0]; } } };
+$GLOBALS['ARCHIVE'][821] = []; $GLOBALS['ARCHIVE'][811] = [];
+clock('2026-11-02 12:00:00');
+$m17 = $mk(721, [['Caption' => 'Terrasse', 'TargetID' => 820, 'Mode' => 1, 'TimeRef' => 4, 'JitterMin' => 0], ['Caption' => 'Flurlampe', 'TargetID' => 821, 'Mode' => 1, 'TimeRef' => 4, 'JitterMin' => 0]]); $m17->props['MinDayEvents'] = 0; $m17->ApplyChanges();
+$m17->fieldUpdates = []; $rF = $m17->FindBrightness();
+$picked = null; foreach ($m17->fieldUpdates as $u) { if ($u[0] === 'BrightnessID' && $u[1] === 'value') { $picked = $u[2]; } }
+check('Sensorsuche trägt die Wetterstation ein — nicht den Innenraum-Melder, nicht die LED-Helligkeit der Wallbox', $picked === 810 && str_contains($rF, '2 Sensor(en) gefunden') && str_contains($rF, 'Wetterstation') && !str_contains($rF, 'LED') && $m17->props['BrightnessID'] === 0, $rF);
+$m17->props['BrightnessID'] = 810; $m17->props['BrightnessDusk'] = 50.0; $m17->props['BrightnessDawn'] = 50.0; $m17->ApplyChanges();
+check('Sensor wird beobachtet (Nachricht registriert), Formular zeigt die Untergruppe mit Statuszeile', isset($m17->messages[810]) && str_contains(formText(form($m17)), '🌤  Außenhelligkeit (optional)') && str_contains(formText(form($m17)), 'Sensor jetzt:'));
+// Vorbild Mo 09.11.: Terrasse 5 min NACH der gemessenen Dämmerung an, Flurlampe 15 min DAVOR; beide 4 h später aus.
+$clearDay('2026-11-09'); $setSun('2026-11-09'); $dusk9 = $ss9 - 600; $dawn9 = $sr9 + 1200;
+$at($sr9 - 3600); fire($m17, 820, true); $at($dawn9 + 600); fire($m17, 820, false);
+$at($dusk9 - 900); fire($m17, 821, true); $at($dusk9 + 300); fire($m17, 820, true); $at($dusk9 + 14400); fire($m17, 820, false); fire($m17, 821, false);
+// Heute Mo 23.11.: dunkle Wolken, es wird schon eine Stunde vor Sonnenuntergang dunkel.
+$clearDay('2026-11-23', false); $setSun('2026-11-23'); $GLOBALS['VARS'][810]['value'] = 500.0;
+clock('2026-11-23 12:00:00'); $m17->SetActive(true);
+$usual = $ss23 - 600; // üblich: wie am Vorbild-Tag 10 min vor Sonnenuntergang
+check('Vor der Dämmerung plant das Modul mit der üblichen Zeit: Terrasse an um Untergang - 5 min', str_contains($m17->Preview(), date('H:i', $usual + 300) . ' An'), $m17->Preview());
+$n = count($GLOBALS['ACTIONS']); $t1 = $ss23 - 3600;
+$at($t1); fire($m17, 810, 10.0); $at($t1 + 300); fire($m17, 810, 10.0);
+check('Sensor erst 5 min dunkel: noch nichts geschaltet (10-Minuten-Regel)', actionsFrom($n) === [], json_encode(actionsFrom($n)));
+$at($t1 + 600); fire($m17, 810, 10.0);
+check('Nach 10 min Dunkelheit gilt die Dämmerung: die Flurlampe (15 min VOR der Dämmerung) wird sofort nachgeholt', array_map(fn($a) => [$a[0], $a[1], $a[2]], actionsFrom($n)) === [[$t1 + 600, 821, true]], json_encode(actionsFrom($n)));
+check('… und „Nächste Schaltung" zeigt die Terrasse 5 min nach der gemessenen Dämmerung', str_contains($m17->GetValue('NextAction'), date('H:i', $t1 + 900) . ' Uhr: Terrasse → An'), $m17->GetValue('NextAction'));
+$at($t1 + 900); $m17->Tick();
+check('Terrasse geht 5 min nach der gemessenen Dämmerung an — 40 min früher als an einem klaren Tag', array_map(fn($a) => [$a[0], $a[1], $a[2]], actionsFrom($n)) === [[$t1 + 600, 821, true], [$t1 + 900, 820, true]] && ($usual + 300) - ($t1 + 900) === 2400, json_encode(actionsFrom($n)));
+$tw = json_decode(GetValueString(IPS_GetObjectIDByIdent('Twilight', 721)), true);
+check('Gemessene Dämmerung beider Tage steht im Speicher (heute live, Vorbild-Tag aus dem Sensor-Archiv)', ($tw['2026-11-23'][1] ?? 0) === $t1 + 600 && ($tw['2026-11-09'] ?? null) === [$dawn9, $dusk9], json_encode($tw));
+$m17->SetActive(false);
+// Mo 30.11.: strahlend klarer Abend, es bleibt länger hell als üblich.
+[$sr30, $ss30] = $sunOf('2026-11-30'); $setSun('2026-11-30'); $GLOBALS['VARS'][810]['value'] = 500.0; $GLOBALS['VARS'][820]['value'] = false; $GLOBALS['VARS'][821]['value'] = false;
+clock('2026-11-30 12:00:00'); $m17->SetActive(true); $n = count($GLOBALS['ACTIONS']); $usual30 = $ss30 - 600;
+$at($usual30 - 900); $m17->Tick();
+check('Flurlampe (15 min vor der Dämmerung) kommt zur üblichen Zeit, solange nichts gemessen ist', array_map(fn($a) => [$a[0], $a[1], $a[2]], actionsFrom($n)) === [[$usual30 - 900, 821, true]], json_encode(actionsFrom($n)));
+$at($usual30 + 300); $m17->Tick();
+check('Übliche Zeit vorbei, aber noch hell: die Terrasse bleibt aus und wartet auf die Dämmerung', count(actionsFrom($n)) === 1, json_encode(actionsFrom($n)));
+$at($ss30 + 1200); fire($m17, 810, 10.0); $at($ss30 + 1500); fire($m17, 810, 10.0); $at($ss30 + 1800); fire($m17, 810, 10.0);
+check('… die Flurlampe wird dabei NICHT ein zweites Mal geschaltet (sie war schon dran)', count(actionsFrom($n)) === 1, json_encode(actionsFrom($n)));
+$at($ss30 + 2100); $m17->Tick();
+check('Dämmerung 30 min nach Sonnenuntergang gemessen: Terrasse geht 5 min danach an — 40 min später als üblich', array_map(fn($a) => [$a[0], $a[1], $a[2]], array_slice(actionsFrom($n), 1)) === [[$ss30 + 2100, 820, true]] && ($ss30 + 2100) - ($usual30 + 300) === 2400, json_encode(actionsFrom($n)));
+$m17->SetActive(false);
+// Mo 07.12.: Sensor ausgefallen (meldet weiter „hell") — spätestens am Ende des Fensters (90 min nach Untergang) wird geschaltet.
+[$sr7, $ss7] = $sunOf('2026-12-07'); $setSun('2026-12-07'); $GLOBALS['VARS'][810]['value'] = 500.0; $GLOBALS['VARS'][820]['value'] = false;
+clock('2026-12-07 12:00:00'); $m17->SetActive(true); $n = count($GLOBALS['ACTIONS']);
+$at($ss7 + 5400 + 300 - 1); $m17->Tick(); $before = count(array_filter(actionsFrom($n), fn($a) => $a[1] === 820));
+$at($ss7 + 5400 + 300); $m17->Tick();
+check('Sensor meldet nie „dunkel": die Terrasse geht am Ende des Fensters trotzdem an (kein dunkles Haus)', $before === 0 && count(array_filter(actionsFrom($n), fn($a) => $a[1] === 820 && $a[2] === true)) === 1, json_encode(actionsFrom($n)));
+$m17->SetActive(false);
+// Beim Lernen läuft die Messung mit, damit künftige Vorbild-Tage ihre Dämmerung kennen.
+[$sr14, $ss14] = $sunOf('2026-12-14'); $GLOBALS['VARS'][810]['value'] = 500.0;
+$at($ss14 - 1800); fire($m17, 810, 30.0); $at($ss14 - 1500); fire($m17, 810, 60.0); $at($ss14 - 1200); fire($m17, 810, 30.0); $at($ss14 - 900); fire($m17, 810, 20.0); $at($ss14 - 600); fire($m17, 810, 10.0);
+$tw = json_decode(GetValueString(IPS_GetObjectIDByIdent('Twilight', 721)), true);
+check('Auch ohne Simulation gemessen; ein kurzes Wieder-hell-Werden setzt die 10 Minuten neu an', ($tw['2026-12-14'][1] ?? 0) === $ss14 - 600, json_encode($tw['2026-12-14'] ?? null));
+$at(strtotime('2026-12-14 12:30:00')); fire($m17, 810, 5.0); $at(strtotime('2026-12-14 12:45:00')); fire($m17, 810, 5.0);
+check('Ein dunkles Gewitter am Mittag ist keine Dämmerung (außerhalb des Fensters um den Sonnenuntergang)', (json_decode(GetValueString(IPS_GetObjectIDByIdent('Twilight', 721)), true)['2026-12-14'][1] ?? 0) === $ss14 - 600);
+// Schwellen vorschlagen: üblicher Wert eine halbe Stunde vor Sonnenuntergang bzw. nach Sonnenaufgang.
+clock('2026-12-20 12:00:00'); $GLOBALS['ARCHIVE'][810] = [];
+for ($d = 1; $d <= 14; $d++) { [$srD, $ssD] = $sunOf(date('Y-m-d', strtotime('2026-12-20 -' . $d . ' days'))); $GLOBALS['ARCHIVE'][810][] = [$ssD - 2000, 70.0 + $d]; $GLOBALS['ARCHIVE'][810][] = [$srD + 1500, 40.0 + $d]; }
+$m17->fieldUpdates = []; $rS = $m17->SuggestBrightness(810);
+$fu = []; foreach ($m17->fieldUpdates as $u) { $fu[$u[0]] = $u[2]; }
+check('Schwellen-Vorschlag: Median der letzten 14 Tage, ins Formular eingetragen, nicht gespeichert', ($fu['BrightnessDusk'] ?? null) === 78.0 && ($fu['BrightnessDawn'] ?? null) === 48.0 && str_contains($rS, 'abends 78') && $m17->props['BrightnessDusk'] === 50.0, $rS . ' ' . json_encode($fu));
+check('Sensor ohne Archiv: klare Auskunft, was man von Hand einträgt', str_contains($m17->SuggestBrightness(812), 'nicht im Archiv geloggt') && str_contains($m17->SuggestBrightness(0), 'zuerst einen Helligkeitssensor'));
+// Ohne Sensor verhält sich „Außenhelligkeit" wie „Sonnenauf- und -untergang".
+$m17->props['BrightnessID'] = 0; $m17->ApplyChanges(); $setSun('2026-12-21'); clock('2026-12-21 03:00:00'); $pB = $m17->Preview();
+$chs = json_decode($m17->props['Channels'], true); foreach ($chs as &$c) { $c['TimeRef'] = 3; } unset($c); $m17->props['Channels'] = json_encode($chs); $m17->ApplyChanges();
+$strip = fn(string $p) => preg_replace('/\(Vorbild[^)]*\)/', '', $p);
+check('Ohne Sensor: gleicher Ablauf wie mit „Sonnenauf- und -untergang", Formular sagt es', $strip($pB) === $strip($m17->Preview()) && str_contains($pB, ' An') && str_contains(formText(form($m17)), 'Kein Helligkeitssensor gewählt'), $pB . ' /// ' . $m17->Preview());
+$GLOBALS['ARCHIVE'] = []; $GLOBALS['ARCHIVE_INST'] = [];
+
+heading('31. Beschriftungen höchstens 40 Zeichen, Erklärung direkt dahinter — Deutsch und Englisch (SUITE.md, 17.11.2026)');
+$measure = function (array $form): array { $long = []; $loose = []; $w = function (array $items) use (&$w, &$long, &$loose) {
+    foreach ($items as $k => $e) {
+        if (!is_array($e)) { continue; }
+        if (isset($e['name'], $e['caption']) && in_array($e['type'] ?? '', ['SelectVariable', 'ValidationTextBox', 'CheckBox', 'NumberSpinner', 'Select', 'SelectInstance'], true) && mb_strlen($e['caption']) > 40) { $long[] = $e['name'] . ' (' . mb_strlen($e['caption']) . ')'; }
+        if (isset($e['name']) && str_ends_with($e['name'], 'Hint') && (($items[$k - 1]['name'] ?? '') !== substr($e['name'], 0, -4))) { $loose[] = $e['name']; }
+        if (isset($e['items'])) { $w($e['items']); }
+    } }; $w($form['elements']); return [$long, $loose]; };
+[$longDe, $looseDe] = $measure(form($m17));
+check('Deutsch: kein Eingabefeld mit mehr als 40 Zeichen Beschriftung', $longDe === [], implode(', ', $longDe));
+check('Jede Erklärung (…Hint) steht direkt hinter ihrem Feld', $looseDe === [], implode(', ', $looseDe));
+$GLOBALS['LANG'] = 'en'; AnwsimTest::resetLanguage(); [$longEn, $looseEn] = $measure(form($m17)); $GLOBALS['LANG'] = 'de'; AnwsimTest::resetLanguage();
+check('Englisch: kein Eingabefeld mit mehr als 40 Zeichen Beschriftung', $longEn === [] && $looseEn === [], implode(', ', $longEn));
 
 heading('12. Fehlgeschlagene Schaltung landet dauerhaft im Protokoll (über $this->LogMessage)');
 $m->props['Channels'] = json_encode([['Caption' => 'Kaputt', 'TargetID' => 100, 'Mode' => 1, 'TimeRef' => 0, 'JitterMin' => 0]]);

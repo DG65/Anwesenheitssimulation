@@ -3,7 +3,7 @@
 # DG65-Toolkit Presence Simulation
 
 ![Symcon](https://img.shields.io/badge/Symcon-PHPModul-blue)
-![Module Version](https://img.shields.io/badge/Module_Version-0.3.2-blue)
+![Module Version](https://img.shields.io/badge/Module_Version-0.3.3-blue)
 ![Symcon Version](https://img.shields.io/badge/Symcon_Version-9.0%2B-blue)
 ![License](https://img.shields.io/badge/License-PolyForm_Noncommercial_1.0.0-lightgrey)
 ![Check Style](https://github.com/DG65/Anwesenheitssimulation/actions/workflows/check-style.yml/badge.svg)
@@ -52,10 +52,19 @@ switched does not serve as reference ("Minimum switching events per reference da
 it ran does not count towards the window afterwards. So the learned days do not run out, however
 long nobody is home.
 
-**Time reference.** Per channel either **clock time** or **distance to sunset/sunrise**. Lighting
-then follows dusk, not the clock. The built-in Symcon Location Control instance (Settings →
+**Time reference.** Per channel either **clock time**, **distance to sunset or sunrise**, **both**
+(sunrise in the morning, sunset in the evening) or **outside brightness**. Lighting then follows
+dusk, not the clock. For the sun position the built-in Symcon Location Control instance (Settings →
 Location) is all that is needed; without it the channel automatically falls back to clock time —
 the form tells you which applies.
+
+**Outside brightness.** With a brightness or irradiance sensor outdoors (e.g. from a weather
+station, lux or W/m²) the module measures dusk and dawn instead of calculating them: they count
+once the value has stayed below the evening threshold, or above the morning threshold, for 10
+minutes. Under dark clouds the lights then come on earlier, on a clear evening later — as real
+residents would do it. "🔎 Find brightness sensor" finds the sensor, "📈 Suggest thresholds" reads
+suitable thresholds from the archive. If the sensor reports nothing, switching happens 90 minutes
+after sunset at the latest.
 
 **Public holidays.** If desired, the public holidays of a region (German federal states, Austria,
 Switzerland) count like Sundays: on a holiday a Sunday is replayed, and a learned holiday itself

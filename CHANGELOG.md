@@ -3,6 +3,38 @@
 Alle nennenswerten Änderungen an diesem Modul werden hier dokumentiert.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 
+## [0.3.3] - 2026-11-18
+
+### Added
+- **Zeitbezug „Sonnenauf- und -untergang"** (Wunsch von Roberto im Forum, Beitrag 2): je Schaltung
+  gilt der Sonnenstand, der am Vorbild-Tag näher lag — morgens der Aufgang, abends der Untergang.
+- **Zeitbezug „Außenhelligkeit"** (Wunsch von Roberto; Dietmar: Wetterstation mit
+  Einstrahlungssensor suchen und einbinden): Ein Helligkeits- oder Einstrahlungssensor misst die
+  Dämmerung. Sie gilt, wenn der Wert im Fenster um den Sonnenstand 10 Minuten unter der
+  Abendschwelle bzw. über der Morgenschwelle bleibt. Gemessen wird immer (auch beim Lernen), je Tag
+  in der versteckten Variable `Twilight`; für Vorbild-Tage ohne Messung einmalig aus dem Archiv des
+  Sensors. Heute gilt vor der Bestätigung die übliche Zeit (Sonnenstand plus mittlerer Abstand der
+  letzten Tage); ist die vorbei und es ist noch hell, wartet die Wiedergabe, längstens bis 90 min
+  nach Sonnenuntergang (morgens 120 min nach Aufgang). Fehlt Sensor oder Messung, gilt der
+  Sonnenstand. `ANWSIM_FindBrightness()` sucht den Sensor (Wetterstation vor Innenraum-Melder,
+  keine LED-Helligkeit), `ANWSIM_SuggestBrightness()` schlägt die Schwellen aus dem Archiv vor.
+- **Kanalliste wächst mit** (8 bis 25 Zeilen; Roberto: „Fenster zu wenig hoch"), Vorschlagsliste
+  12 Zeilen.
+
+### Changed
+- **Fortschritt der Wiedergabe als Zähler** (`done` je Kanal) statt als Uhrzeit: Weil sich die
+  Zeiten bei „Außenhelligkeit" im Lauf des Tages verschieben, wird eine vorgerückte Schaltung
+  nachgeholt und eine nach hinten gerückte nicht doppelt abgespielt. Laufende Simulationen aus
+  älteren Versionen werden beim ersten Tick umgestellt.
+- **Sonnenstand unabhängig von der Uhrzeit zugeordnet:** Bisher galt der Sonnenuntergang, der
+  „jetzt" am nächsten lag — nachts also der gestrige. Jetzt behält jede Schaltung den Tagesabstand
+  ihres Vorbilds (eine Schaltung um 01:00 hängt am Vorabend, eine um 20:00 am selben Abend) und hat
+  damit den ganzen Tag über dieselbe Zeit. Vorschau und „Heutiger Ablauf" zeigen nachts nicht mehr
+  die Abend-Schaltungen zuerst.
+- **Formular nach der 40-Zeichen-Regel** (SUITE.md, 17.11.2026): kurze Beschriftungen, die
+  Erklärung als `<Feld>Hint` direkt dahinter; der Prüfstand misst das fertige Formular in Deutsch
+  und Englisch. Die Abhilfe aus 0.3.2 (volle Breite) entfällt.
+
 ## [0.3.2] - 2026-11-18
 
 ### Fixed

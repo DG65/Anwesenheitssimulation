@@ -22,7 +22,7 @@ Der Bewohnersimulator ist eine Anwesenheitssimulation aus dem DG65-Toolkit: Er l
 
 Lernen: Jede echte Wertänderung der gewählten Variablen wird mit Zeitpunkt gemerkt. Ein Archiv ist dafür nicht nötig. Wird eine Variable aber im Archiv geloggt, übernimmt das Modul ihren bisherigen Schaltverlauf und ist sofort einsatzbereit. Das Lernfenster (Standard 28 Tage) rollt mit, so folgt das Muster der Jahreszeit.
 Abspielen: Für jeden Tag wählt das Modul einen echten Vorbild-Tag desselben Wochentags und spielt dessen Schaltfolge sekundengenau ab, verschoben um einen zufälligen Versatz. Auch bei langer Abwesenheit gehen die gelernten Tage nicht aus. Alle Kanäle nehmen auf Wunsch denselben Vorbild-Tag, die Reihenfolge zwischen den Räumen bleibt echt.
-Zeitbezug: Je Kanal Uhrzeit oder Abstand zu Sonnenauf- oder -untergang (über die Location Control).
+Zeitbezug: Je Kanal Uhrzeit, Abstand zu Sonnenauf- oder -untergang oder die gemessene Außenhelligkeit, z. B. von einer Wetterstation. Unter dunklen Wolken geht das Licht dann früher an.
 Einrichten: „Passende Variablen suchen“ schlägt die geloggten Lichter, Dimmer, Rollläden und Steckdosen vor, die regelmäßig geschaltet werden. Anhaken, übernehmen, fertig.
 Start: Schalter „Simulation aktiv“ (auch in der Visualisierung), Knopf im Formular, Skript oder eine Auslöser-Variable. Das kann eine Abwesenheits-Variable sein oder ein Hausmodus, auf Wunsch mit Startverzögerung.
 Ende: Alles so lassen, den Zustand von vor dem Start wiederherstellen oder alles Abgespielte ausschalten.
@@ -38,7 +38,7 @@ The Resident Simulator is a presence simulation from the DG65-Toolkit: it makes 
 
 Learning: every real value change of the chosen variables is remembered with its time. No archive is needed. But if a variable is logged in the archive, the module takes over its switching history and is ready to use right away. The learning window (default 28 days) rolls along, so the pattern follows the season.
 Replaying: for each day the module picks a real reference day of the same weekday and replays its switching sequence to the second, shifted by a random offset. Even during long absences the learned days do not run out. If desired, all channels use the same reference day, so the order between the rooms stays real.
-Time reference: per channel clock time or distance to sunrise or sunset (via Location Control).
+Time reference: per channel clock time, distance to sunrise or sunset, or the measured outside brightness, e.g. from a weather station. Under dark clouds the lights then come on earlier.
 Setup: "Find suitable variables" suggests the logged lights, dimmers, shutters and sockets that are switched regularly. Tick, add, done.
 Start: the switch "Simulation active" (also in the visualization), a button in the form, a script or a trigger variable. That can be an absence variable or a house mode, with a start delay if desired.
 End: leave everything as it is, restore the state from before the start, or switch off everything that was replayed.
@@ -48,6 +48,20 @@ Notifications: if desired, you get a push notification when a switching fails or
 Overview: "Show today's schedule" shows in advance what would be replayed today. The variable "Today's schedule" shows the current and the next state per channel in the visualization. "Last switching" and "Next switching" are available as variables, too.
 
 While the simulation is running, nothing is learned. The module follows the language of your Symcon (English or German).
+
+## de — Versionsinformation (0.3.3)
+- Neu: Zeitbezug „Sonnenauf- und -untergang“ (morgens gilt der Aufgang, abends der Untergang).
+- Neu: Zeitbezug „Außenhelligkeit“: Ein Helligkeits- oder Einstrahlungssensor, z. B. von einer Wetterstation, bestimmt die Dämmerung. Unter dunklen Wolken geht das Licht früher an.
+- Neu: Die Kanalliste wächst mit der Zahl der Kanäle.
+- Neu: Kurze Feld-Beschriftungen, die Erklärung steht unter dem Feld.
+- Fix: Abend-Schaltungen mit Sonnenbezug werden auch nachts dem richtigen Tag zugeordnet.
+
+## en — Release notes (0.3.3)
+- New: time reference "Sunrise and sunset" (sunrise in the morning, sunset in the evening).
+- New: time reference "Outside brightness": a brightness or irradiance sensor, e.g. from a weather station, decides when it is dusk and dawn. Under dark clouds the lights come on earlier.
+- New: the channel list grows with the number of channels.
+- New: short field captions, the explanation stands below the field.
+- Fix: evening switchings with a sun reference are assigned to the right day at night, too.
 
 ## de — Versionsinformation (0.3.2)
 - Fix: Die Beschriftung der Werteliste beim Auslöser wird nicht mehr abgeschnitten.

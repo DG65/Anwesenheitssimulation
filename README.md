@@ -3,7 +3,7 @@
 # DG65-Toolkit Anwesenheitssimulation
 
 ![Symcon](https://img.shields.io/badge/Symcon-PHPModul-blue)
-![Modul Version](https://img.shields.io/badge/Modul_Version-0.3.2-blue)
+![Modul Version](https://img.shields.io/badge/Modul_Version-0.3.3-blue)
 ![Symcon Version](https://img.shields.io/badge/Symcon_Version-9.0%2B-blue)
 ![License](https://img.shields.io/badge/License-PolyForm_Noncommercial_1.0.0-lightgrey)
 ![Check Style](https://github.com/DG65/Anwesenheitssimulation/actions/workflows/check-style.yml/badge.svg)
@@ -52,10 +52,18 @@ Standard 4).
 in der sie lief, zählt auch danach nicht zum Fenster. Die gelernten Tage gehen also nicht aus,
 egal wie lange niemand da ist.
 
-**Zeitbezug.** Je Kanal wahlweise **Uhrzeit** oder **Abstand zu Sonnenuntergang/-aufgang**.
-Beleuchtung folgt damit der Dämmerung, nicht der Uhr. Dafür reicht Symcons eingebaute
-Location-Control-Instanz (Einstellungen → Standort); ohne sie fällt der Kanal automatisch auf die
-Uhrzeit zurück — das Formular sagt, was gerade gilt.
+**Zeitbezug.** Je Kanal wahlweise **Uhrzeit**, **Abstand zu Sonnenuntergang oder -aufgang**, **beides**
+(morgens gilt der Aufgang, abends der Untergang) oder **Außenhelligkeit**. Beleuchtung folgt damit
+der Dämmerung, nicht der Uhr. Für den Sonnenstand reicht Symcons eingebaute Location-Control-Instanz
+(Einstellungen → Standort); ohne sie fällt der Kanal automatisch auf die Uhrzeit zurück — das
+Formular sagt, was gerade gilt.
+
+**Außenhelligkeit.** Mit einem Helligkeits- oder Einstrahlungssensor im Freien (z. B. von einer
+Wetterstation, Lux oder W/m²) misst das Modul die Dämmerung, statt sie zu berechnen: Sie gilt, sobald
+der Wert 10 Minuten lang unter der Abendschwelle bzw. über der Morgenschwelle liegt. Unter dunklen
+Wolken geht das Licht dann früher an, an einem klaren Abend später — wie bei echten Bewohnern.
+„🔎 Helligkeitssensor suchen" findet den Sensor, „📈 Schwellen vorschlagen" liest passende Schwellen
+aus dem Archiv. Meldet der Sensor nichts, wird spätestens 90 Minuten nach Sonnenuntergang geschaltet.
 
 **Feiertage.** Auf Wunsch zählen die gesetzlichen Feiertage einer Region (deutsche Bundesländer,
 Österreich, Schweiz) wie Sonntage: An einem Feiertag wird ein Sonntag abgespielt, und ein gelernter
